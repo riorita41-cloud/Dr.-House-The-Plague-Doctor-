@@ -1,0 +1,2605 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чумной доктор — Измерение пульса</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ═══════════════════════════════════════════════
+           ШРИФТ
+        ═══════════════════════════════════════════════ */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        /* ═══════════════════════════════════════════════
+           CSS ПЕРЕМЕННЫЕ
+        ═══════════════════════════════════════════════ */
+        :root {
+            --bg:         #fafbff;
+            --bg2:        #f0f2fa;
+            --bg3:        #e8ebf7;
+            --surface:    #ffffff;
+            --surface2:   #f5f7ff;
+            --border:     #e2e6f3;
+            --border2:    #d0d5ee;
+
+            --p1:  #6c47ff;
+            --p2:  #8b6fff;
+            --p3:  #ede9ff;
+            --p4:  #f5f3ff;
+
+            --pulse:  #e8365d;
+            --pulse2: #ff6b8a;
+            --pulse3: #fff0f3;
+
+            --emg:  #0ea87a;
+            --emg2: #34d399;
+            --emg3: #f0fdf9;
+
+            --eeg:  #f59e0b;
+            --eeg2: #fbbf24;
+            --eeg3: #fffbeb;
+
+            --txt:  #1a1d2e;
+            --txt2: #4a5080;
+            --txt3: #8890b5;
+            --txt4: #b8bdd8;
+
+            --ok:   #10b981;
+            --err:  #ef4444;
+            --warn: #f59e0b;
+
+            --sh1: 0 1px 3px rgba(108,71,255,0.06), 0 4px 16px rgba(108,71,255,0.08);
+            --sh2: 0 4px 24px rgba(108,71,255,0.12), 0 1px 4px rgba(0,0,0,0.04);
+            --sh3: 0 8px 40px rgba(108,71,255,0.15);
+
+            --r:  18px;
+            --rs: 12px;
+            --rx: 10px;
+            --tr: all 0.25s cubic-bezier(.4,0,.2,1);
+        }
+
+        /* ═══════════════════════════════════════════════
+           СБРОС
+        ═══════════════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--txt);
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg2); }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--txt4); }
+
+        /* ═══════════════════════════════════════════════
+           СТРАНИЦЫ
+        ═══════════════════════════════════════════════ */
+        .page { display: none; min-height: 100vh; }
+        .page.active { display: block; }
+
+        /* ═══════════════════════════════════════════════
+           НАВИГАЦИЯ
+        ═══════════════════════════════════════════════ */
+        .navbar {
+            position: sticky; top: 0; z-index: 200;
+            background: rgba(250,251,255,0.85);
+            backdrop-filter: blur(24px);
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            height: 64px;
+        }
+
+        .nav-brand {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 1.2rem; font-weight: 800;
+            color: var(--p1); cursor: pointer;
+            letter-spacing: -0.5px; text-decoration: none;
+            user-select: none;
+        }
+
+        .brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--p1), var(--p2));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 1rem;
+            box-shadow: 0 4px 14px rgba(108,71,255,0.3);
+        }
+
+        .nav-center {
+            display: flex; align-items: center; gap: 2px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: var(--txt2);
+            border: none;
+            background: none; border: none;
+            color: var(--txt3);
+            padding: 7px 16px;
+            border-radius: 9px;
+            font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; transition: var(--tr);
+            display: flex; align-items: center; gap: 7px;
+            white-space: nowrap;
+        }
+
+        /* hover — лёгкий эффект */
+        .nav-btn:hover {
+            background: var(--bg3);
+            color: var(--txt);
+        }
+
+        /* ✅ ТОЛЬКО активная кнопка подсвечена */
+        .nav-btn.active {
+            background: #fff;
+            color: var(--p1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .nav-right { display: flex; align-items: center; gap: 10px; }
+
+        .nav-guest { display: flex; gap: 8px; align-items: center; }
+
+        .nav-user-block {
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--p1), var(--p2));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 0.85rem; color: #fff;
+            cursor: pointer; flex-shrink: 0;
+            box-shadow: 0 2px 10px rgba(108,71,255,0.25);
+            transition: var(--tr);
+        }
+
+        .avatar:hover { transform: scale(1.07); }
+
+        .nav-user-info { line-height: 1.2; }
+        .nav-user-name { font-size: 0.85rem; font-weight: 700; color: var(--txt); }
+        .nav-user-role { font-size: 0.72rem; color: var(--txt3); }
+
+        /* ═══════════════════════════════════════════════
+           ТОСТЫ
+        ═══════════════════════════════════════════════ */
+        .toast-wrap {
+            position: fixed; top: 74px; right: 20px;
+            z-index: 9999; display: flex; flex-direction: column; gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--rs);
+            padding: 14px 18px;
+            display: flex; align-items: center; gap: 12px;
+            min-width: 270px; max-width: 340px;
+            box-shadow: var(--sh2);
+            animation: tIn .3s cubic-bezier(.4,0,.2,1);
+            pointer-events: all;
+            font-size: 0.87rem; font-weight: 500; color: var(--txt);
+        }
+
+        .toast.out { animation: tOut .3s ease forwards; }
+
+        @keyframes tIn  { from { transform: translateX(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes tOut { from { transform: none; opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
+
+        .toast-ok   { border-left: 3px solid var(--ok);  }
+        .toast-err  { border-left: 3px solid var(--err); }
+        .toast-info { border-left: 3px solid var(--p1);  }
+        .toast-warn { border-left: 3px solid var(--warn);}
+
+        .toast-ok   i { color: var(--ok); }
+        .toast-err  i { color: var(--err); }
+        .toast-info i { color: var(--p1); }
+        .toast-warn i { color: var(--warn); }
+
+        /* ═══════════════════════════════════════════════
+           КНОПКИ
+        ═══════════════════════════════════════════════ */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 22px;
+            border-radius: var(--rx); border: none;
+            font-size: 0.88rem; font-weight: 700;
+            cursor: pointer; transition: var(--tr);
+            text-decoration: none; white-space: nowrap;
+            font-family: inherit; letter-spacing: -0.2px;
+        }
+
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--p1) 0%, #5a35f0 100%);
+            color: #fff;
+            box-shadow: 0 4px 18px rgba(108,71,255,0.3);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 6px 28px rgba(108,71,255,0.45);
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--border2);
+            color: var(--txt2);
+        }
+        .btn-outline:hover { border-color: var(--p1); color: var(--p1); background: var(--p4); }
+
+        .btn-ghost {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            color: var(--txt2);
+        }
+        .btn-ghost:hover { background: var(--bg3); color: var(--txt); }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff; box-shadow: 0 4px 14px rgba(239,68,68,0.2);
+        }
+        .btn-danger:hover { box-shadow: 0 6px 22px rgba(239,68,68,0.35); transform: translateY(-1px); }
+        .btn-danger:disabled { opacity: .4; pointer-events: none; }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff; box-shadow: 0 4px 14px rgba(16,185,129,0.2);
+        }
+        .btn-success:hover { box-shadow: 0 6px 22px rgba(16,185,129,0.35); transform: translateY(-1px); }
+        .btn-success:disabled { opacity: .4; pointer-events: none; }
+
+        .btn-sm  { padding: 7px 16px; font-size: 0.82rem; border-radius: 9px; }
+        .btn-lg  { padding: 13px 30px; font-size: 0.95rem; border-radius: 14px; }
+        .btn-xl  { padding: 16px 36px; font-size: 1rem;    border-radius: 16px; }
+        .btn-icon{ padding: 9px 11px; }
+        .btn-full{ width: 100%; justify-content: center; }
+
+        /* ═══════════════════════════════════════════════
+           ПОЛЯ ФОРМ
+        ═══════════════════════════════════════════════ */
+        .form-group { margin-bottom: 18px; }
+
+        .form-label {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.8rem; font-weight: 700;
+            color: var(--txt2); margin-bottom: 7px;
+            text-transform: uppercase; letter-spacing: 0.4px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: var(--bg2);
+            border: 1.5px solid var(--border);
+            border-radius: var(--rx);
+            color: var(--txt);
+            padding: 11px 14px;
+            font-size: 0.9rem; font-family: inherit;
+            transition: var(--tr); outline: none;
+        }
+
+        .form-control:focus {
+            border-color: var(--p1);
+            background: var(--surface);
+            box-shadow: 0 0 0 4px rgba(108,71,255,0.1);
+        }
+
+        .form-control::placeholder { color: var(--txt4); }
+        .form-control.err { border-color: var(--err); box-shadow: 0 0 0 4px rgba(239,68,68,0.08); }
+        .form-control.ok  { border-color: var(--ok);  }
+
+        .field-err { font-size: 0.77rem; color: var(--err); margin-top: 5px; display: none; }
+        .field-err.show { display: block; }
+
+        .input-wrap { position: relative; }
+        .input-wrap .form-control { padding-right: 44px; }
+        .eye-btn {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--txt4);
+            cursor: pointer; font-size: 0.85rem; transition: var(--tr); padding: 4px;
+        }
+        .eye-btn:hover { color: var(--txt2); }
+
+        .pw-bar   { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; margin: 7px 0 4px; }
+        .pw-fill  { height: 100%; border-radius: 2px; transition: var(--tr); width: 0; }
+        .pw-label { font-size: 0.75rem; color: var(--txt4); }
+
+        /* ═══════════════════════════════════════════════
+           СТРАНИЦА — ГЛАВНАЯ
+        ═══════════════════════════════════════════════ */
+        .landing { background: var(--bg); }
+
+        /* Hero */
+        .hero-wrap {
+            position: relative; overflow: hidden;
+            background: linear-gradient(160deg, #f5f3ff 0%, #fafbff 45%, #f0fdf9 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero-deco {
+            position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+        }
+
+        .hero-blob {
+            position: absolute; border-radius: 50%;
+            filter: blur(70px); opacity: 0.35;
+        }
+
+        .blob1 {
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, #c4b5fd, transparent 70%);
+            top: -200px; left: -150px;
+        }
+
+        .blob2 {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, #a7f3d0, transparent 70%);
+            bottom: -150px; right: -100px;
+        }
+
+        .blob3 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, #fde68a, transparent 70%);
+            top: 50px; right: 300px;
+        }
+
+        .hero-inner {
+            max-width: 1080px; margin: 0 auto;
+            padding: 100px 32px 90px;
+            text-align: center;
+            position: relative; z-index: 1;
+        }
+
+        .hero-chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(108,71,255,0.1);
+            border: 1px solid rgba(108,71,255,0.2);
+            color: var(--p1);
+            padding: 6px 16px; border-radius: 100px;
+            font-size: 0.8rem; font-weight: 700;
+            margin-bottom: 28px; letter-spacing: 0.3px;
+        }
+
+        .hero-chip span {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--p1); animation: chipBlink 2s infinite;
+        }
+
+        @keyframes chipBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+        .hero-title {
+            font-size: 4rem; font-weight: 900;
+            line-height: 1.06; letter-spacing: -2px;
+            margin-bottom: 22px; color: var(--txt);
+        }
+
+        .hero-title .line2 {
+            background: linear-gradient(135deg, var(--p1) 0%, #e8365d 50%, var(--eeg) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-desc {
+            font-size: 1.1rem; color: var(--txt2);
+            line-height: 1.75; max-width: 560px; margin: 0 auto 40px;
+            font-weight: 400;
+        }
+
+        .hero-actions {
+            display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+            margin-bottom: 60px;
+        }
+
+        .hero-tags {
+            display: flex; align-items: center; justify-content: center;
+            gap: 24px; flex-wrap: wrap;
+        }
+
+        .hero-tag {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.83rem; color: var(--txt3); font-weight: 500;
+        }
+
+        .hero-tag i { font-size: 0.78rem; }
+
+        /* Карточки сигналов (без графиков) */
+        .signals-section {
+            max-width: 1080px; margin: 0 auto;
+            padding: 72px 32px;
+        }
+
+        .section-label {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 0.78rem; font-weight: 700; color: var(--txt3);
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 14px;
+        }
+
+        .section-label::before, .section-label::after {
+            content: ''; flex: 1; height: 1px; background: var(--border);
+        }
+
+        .section-title {
+            font-size: 2.2rem; font-weight: 900;
+            letter-spacing: -0.8px; text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .section-sub {
+            text-align: center; color: var(--txt3);
+            font-size: 1rem; margin-bottom: 52px;
+        }
+
+        .signal-cards {
+            display: grid; grid-template-columns: repeat(3,1fr); gap: 20px;
+        }
+
+        .signal-card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 20px;
+            padding: 30px 26px;
+            transition: var(--tr);
+            position: relative; overflow: hidden;
+        }
+
+        .signal-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--sh2);
+        }
+
+        .signal-card::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+        }
+
+        .signal-card.pulse-card::before { background: linear-gradient(90deg, var(--pulse), var(--pulse2)); }
+        .signal-card.emg-card::before { background: linear-gradient(90deg, var(--emg), var(--emg2)); }
+        .signal-card.eeg-card::before { background: linear-gradient(90deg, var(--eeg), var(--eeg2)); }
+
+        .sc-icon {
+            width: 54px; height: 54px; border-radius: 15px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; margin-bottom: 20px;
+        }
+
+        .pulse-card .sc-icon { background: var(--pulse3); color: var(--pulse); }
+        .emg-card .sc-icon { background: var(--emg3); color: var(--emg); }
+        .eeg-card .sc-icon { background: var(--eeg3); color: var(--eeg); }
+
+        .sc-title { font-size: 1.05rem; font-weight: 800; margin-bottom: 6px; }
+        .sc-abbr  { font-size: 0.75rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
+        .pulse-card .sc-abbr { color: var(--pulse); }
+        .emg-card .sc-abbr { color: var(--emg); }
+        .eeg-card .sc-abbr { color: var(--eeg); }
+
+        .sc-desc { font-size: 0.87rem; color: var(--txt2); line-height: 1.65; margin-bottom: 20px; }
+
+        .sc-params { display: flex; flex-direction: column; gap: 8px; }
+
+        .sc-param {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.82rem; color: var(--txt3);
+        }
+
+        .sc-param i { font-size: 0.7rem; }
+        .pulse-card .sc-param i { color: var(--pulse); }
+        .emg-card .sc-param i { color: var(--emg); }
+        .eeg-card .sc-param i { color: var(--eeg); }
+
+        /* Статистика */
+        .stats-section {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-inner {
+            max-width: 1080px; margin: 0 auto;
+            padding: 56px 32px;
+            display: grid; grid-template-columns: repeat(4,1fr); gap: 0;
+        }
+
+        .stat-item {
+            text-align: center; padding: 20px;
+            border-right: 1px solid var(--border);
+        }
+
+        .stat-item:last-child { border-right: none; }
+
+        .stat-num {
+            font-size: 2.6rem; font-weight: 900;
+            letter-spacing: -1px; line-height: 1;
+            background: linear-gradient(135deg, var(--p1), var(--pulse));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-lbl { font-size: 0.88rem; color: var(--txt3); font-weight: 500; }
+
+        /* CTA */
+        .cta-section {
+            max-width: 1080px; margin: 0 auto;
+            padding: 80px 32px;
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, var(--p1) 0%, #5a35f0 50%, #3d1fcf 100%);
+            border-radius: 24px;
+            padding: 60px 48px;
+            text-align: center;
+            position: relative; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(108,71,255,0.3);
+        }
+
+        .cta-box::before {
+            content: ''; position: absolute; inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .cta-inner { position: relative; z-index: 1; }
+
+        .cta-box h2 { font-size: 2.2rem; font-weight: 900; color: #fff; letter-spacing: -0.8px; margin-bottom: 14px; }
+        .cta-box p  { font-size: 1rem; color: rgba(255,255,255,0.75); margin-bottom: 32px; }
+
+        .btn-white {
+            background: #fff; color: var(--p1);
+            font-weight: 800; border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+
+        .btn-white-outline {
+            background: transparent; border: 2px solid rgba(255,255,255,0.4);
+            color: #fff; font-weight: 700;
+        }
+        .btn-white-outline:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.7); }
+
+        /* Footer */
+        .footer {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            text-align: center;
+            padding: 28px;
+            font-size: 0.83rem; color: var(--txt3);
+        }
+
+        /* ═══════════════════════════════════════════════
+           АУТЕНТИФИКАЦИЯ
+        ═══════════════════════════════════════════════ */
+        .auth-wrap {
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 40px 16px;
+            background: linear-gradient(145deg, var(--p4) 0%, var(--bg) 40%, var(--emg3) 100%);
+        }
+
+        .auth-card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 24px;
+            padding: 44px 40px;
+            width: 100%; max-width: 450px;
+            box-shadow: var(--sh3);
+        }
+
+        .auth-top { text-align: center; margin-bottom: 32px; }
+
+        .auth-logo {
+            width: 64px; height: 64px;
+            background: linear-gradient(135deg, var(--p1), var(--p2));
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; color: #fff;
+            margin: 0 auto 16px;
+            box-shadow: 0 8px 28px rgba(108,71,255,0.3);
+        }
+
+        .auth-top h2 { font-size: 1.55rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 5px; }
+        .auth-top p  { font-size: 0.87rem; color: var(--txt3); }
+
+        .auth-foot  {
+            text-align: center; margin-top: 24px;
+            font-size: 0.87rem; color: var(--txt3);
+        }
+
+        .auth-foot a {
+            color: var(--p1); text-decoration: none; font-weight: 700; cursor: pointer;
+        }
+        .auth-foot a:hover { text-decoration: underline; }
+
+        /* Аватар */
+        .ava-row {
+            display: flex; gap: 10px; justify-content: center; margin-bottom: 22px;
+        }
+
+        .ava-opt {
+            width: 44px; height: 44px; border-radius: 50%;
+            cursor: pointer; border: 2px solid transparent;
+            transition: var(--tr); display: flex; align-items: center;
+            justify-content: center; font-size: 1.15rem;
+        }
+
+        .ava-opt:hover  { transform: scale(1.1); }
+        .ava-opt.picked { border-color: var(--p1); box-shadow: 0 0 0 3px rgba(108,71,255,0.2); }
+
+        /* ═══════════════════════════════════════════════
+           ДАШБОРД
+        ═══════════════════════════════════════════════ */
+        .dash-wrap { padding: 28px 32px 48px; max-width: 1440px; margin: 0 auto; }
+
+        .dash-head {
+            display: flex; align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 28px; gap: 16px; flex-wrap: wrap;
+        }
+
+        .dash-head-left h1 {
+            font-size: 1.7rem; font-weight: 900;
+            letter-spacing: -0.6px; color: var(--txt);
+        }
+
+        .dash-head-left p { font-size: 0.85rem; color: var(--txt3); margin-top: 4px; }
+
+        .dash-controls { display: flex; align-items: center; gap: 10px; }
+
+        /* Статус */
+        .status-pill {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 100px;
+            padding: 7px 18px;
+            font-size: 0.82rem; font-weight: 700; color: var(--txt3);
+            transition: var(--tr);
+        }
+
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--border2); transition: var(--tr);
+        }
+
+        .status-pill.live { border-color: rgba(16,185,129,0.3); color: var(--ok); }
+        .status-pill.live .status-dot {
+            background: var(--ok);
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.2);
+            animation: dotPulse 2s infinite;
+        }
+
+        @keyframes dotPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* Метрики */
+        .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 22px; }
+
+        .m-card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--r);
+            padding: 20px 22px;
+            transition: var(--tr);
+            position: relative;
+        }
+
+        .m-card:hover { box-shadow: var(--sh1); }
+
+        .m-card-accent {
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            border-radius: var(--r) var(--r) 0 0;
+        }
+
+        .m-card.pulse-m .m-card-accent { background: linear-gradient(90deg, var(--pulse), var(--pulse2)); }
+        .m-card.emg-m .m-card-accent { background: linear-gradient(90deg, var(--emg), var(--emg2)); }
+        .m-card.eeg-m .m-card-accent { background: linear-gradient(90deg, var(--eeg), var(--eeg2)); }
+        .m-card.acc-m .m-card-accent { background: linear-gradient(90deg, var(--p1),  var(--p2));  }
+
+        .m-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+
+        .m-label {
+            font-size: 0.72rem; font-weight: 700; color: var(--txt3);
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .m-ico {
+            width: 34px; height: 34px; border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.95rem;
+        }
+
+        .pulse-m .m-ico { background: var(--pulse3); color: var(--pulse); }
+        .emg-m .m-ico { background: var(--emg3); color: var(--emg); }
+        .eeg-m .m-ico { background: var(--eeg3); color: var(--eeg); }
+        .acc-m .m-ico { background: var(--p4);   color: var(--p1);  }
+
+        .m-val {
+            font-size: 2.1rem; font-weight: 900;
+            letter-spacing: -1px; line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .pulse-m .m-val { color: var(--pulse); }
+        .emg-m .m-val { color: var(--emg); }
+        .eeg-m .m-val { color: var(--eeg); }
+        .acc-m .m-val { color: var(--p1);  }
+
+        .m-unit { font-size: 0.73rem; color: var(--txt4); margin-top: 4px; }
+
+        /* Карточки графиков */
+        .chart-grid { display: grid; gap: 16px; margin-bottom: 16px; }
+        .grid-1   { grid-template-columns: 1fr; }
+        .grid-2   { grid-template-columns: 1fr 1fr; }
+        .grid-2-1 { grid-template-columns: 1fr 1fr; }
+
+        .chart-card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--r);
+            padding: 20px 22px;
+            transition: var(--tr);
+        }
+
+        .chart-card:hover { box-shadow: var(--sh1); }
+
+        .cc-head {
+            display: flex; align-items: flex-start;
+            justify-content: space-between; margin-bottom: 16px;
+        }
+
+        .cc-title {
+            display: flex; align-items: center; gap: 9px;
+            font-size: 0.93rem; font-weight: 800; color: var(--txt);
+        }
+
+        .cdot {
+            width: 9px; height: 9px; border-radius: 50%;
+        }
+
+        .cdot-pulse { background: var(--pulse); box-shadow: 0 0 0 3px rgba(232,54,93,.15); }
+        .cdot-emg { background: var(--emg); box-shadow: 0 0 0 3px rgba(14,168,122,.15); }
+        .cdot-eeg { background: var(--eeg); box-shadow: 0 0 0 3px rgba(245,158,11,.15); }
+
+        .cc-sub  { font-size: 0.75rem; color: var(--txt4); margin-top: 3px; }
+
+        .cc-badge {
+            background: var(--p4);
+            border: 1px solid rgba(108,71,255,0.15);
+            color: var(--p1);
+            border-radius: 20px; padding: 4px 12px;
+            font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+        }
+
+        .chart-box { position: relative; }
+        .h150 { height: 150px; }
+        .h170 { height: 170px; }
+        .h210 { height: 210px; }
+
+        /* Таблица значений */
+        .val-tbl { width: 100%; border-collapse: collapse; }
+        .val-tbl tr { border-bottom: 1px solid var(--border); transition: var(--tr); }
+        .val-tbl tr:last-child { border: none; }
+        .val-tbl tr:hover td { background: var(--bg2); }
+        .val-tbl td { padding: 9px 8px; font-size: 0.83rem; vertical-align: middle; }
+        .td-l { color: var(--txt3); }
+        .td-v { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .td-u { color: var(--txt4); padding-left: 6px; width: 42px; font-size: 0.78rem; }
+
+        .tag {
+            display: inline-block; padding: 2px 7px;
+            border-radius: 5px; font-size: 0.68rem;
+            font-weight: 800; letter-spacing: 0.3px; margin-right: 5px;
+        }
+
+        .tag-pulse { background: var(--pulse3); color: var(--pulse); }
+        .tag-emg { background: var(--emg3); color: var(--emg); }
+        .tag-eeg { background: var(--eeg3); color: var(--eeg); }
+
+        /* ═══════════════════════════════════════════════
+           ИСТОРИЯ
+        ═══════════════════════════════════════════════ */
+        .hist-wrap { padding: 28px 32px 48px; max-width: 1200px; margin: 0 auto; }
+
+        .hist-head {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px; flex-wrap: wrap; gap: 14px;
+        }
+
+        .hist-stats-row { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+
+        .hstat {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 22px; min-width: 160px;
+        }
+
+        .hstat-l { font-size: 0.72rem; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .hstat-v { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px; }
+
+        .tbl-wrap {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--r); overflow: hidden;
+        }
+
+        .data-tbl { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+
+        .data-tbl thead th {
+            background: var(--bg2);
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 0.71rem; font-weight: 700;
+            color: var(--txt3); text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1.5px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .data-tbl tbody tr { border-bottom: 1px solid var(--border); transition: var(--tr); }
+        .data-tbl tbody tr:last-child { border: none; }
+        .data-tbl tbody tr:hover td { background: var(--bg2); }
+
+        .data-tbl tbody td {
+            padding: 10px 14px;
+            color: var(--txt2);
+            font-variant-numeric: tabular-nums;
+            vertical-align: middle;
+        }
+
+        .tc { color: var(--txt4); font-size: 0.78rem; white-space: nowrap; }
+
+        .empty {
+            text-align: center; padding: 80px 20px;
+        }
+
+        .empty-ico { font-size: 3rem; color: var(--border2); margin-bottom: 16px; }
+        .empty h3  { font-size: 1.2rem; color: var(--txt2); margin-bottom: 8px; }
+        .empty p   { font-size: 0.87rem; color: var(--txt3); margin-bottom: 22px; }
+
+        /* Пагинация */
+        .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 22px; flex-wrap: wrap; }
+
+        .pg-btn {
+            min-width: 36px; height: 36px; border-radius: 9px;
+            border: 1.5px solid var(--border); background: var(--surface);
+            color: var(--txt2); font-size: 0.85rem; font-weight: 700;
+            cursor: pointer; transition: var(--tr);
+            display: flex; align-items: center; justify-content: center; padding: 0 10px;
+            font-family: inherit;
+        }
+
+        .pg-btn:hover    { border-color: var(--p1); color: var(--p1); background: var(--p4); }
+        .pg-btn.cur      { background: var(--p1); border-color: var(--p1); color: #fff; }
+        .pg-btn:disabled { opacity: .35; pointer-events: none; }
+
+        /* ═══════════════════════════════════════════════
+           ПРОФИЛЬ
+        ═══════════════════════════════════════════════ */
+        .prof-wrap { padding: 28px 32px 48px; max-width: 960px; margin: 0 auto; }
+
+        .prof-hero {
+            background: linear-gradient(135deg, var(--p1) 0%, #5a35f0 100%);
+            border-radius: 20px; padding: 36px;
+            display: flex; align-items: center; gap: 24px;
+            margin-bottom: 22px; position: relative; overflow: hidden;
+            box-shadow: 0 10px 40px rgba(108,71,255,0.25);
+        }
+
+        .prof-hero::after {
+            content: ''; position: absolute;
+            width: 300px; height: 300px; border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            right: -80px; top: -80px;
+        }
+
+        .prof-ava {
+            width: 80px; height: 80px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: 900; color: #fff;
+            border: 3px solid rgba(255,255,255,0.3);
+            flex-shrink: 0; position: relative; z-index: 1;
+        }
+
+        .prof-info { position: relative; z-index: 1; }
+        .prof-info h2 { font-size: 1.6rem; font-weight: 900; color: #fff; }
+        .prof-info p  { color: rgba(255,255,255,0.7); font-size: 0.87rem; margin-top: 4px; }
+
+        .prof-meta { display: flex; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+
+        .prof-meta-item {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.83rem; color: rgba(255,255,255,0.75); font-weight: 500;
+        }
+
+        .prof-meta-item i { color: rgba(255,255,255,0.5); font-size: 0.78rem; }
+
+        .prof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .prof-card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--r); padding: 26px;
+        }
+
+        .prof-card h3 {
+            font-size: 0.85rem; font-weight: 800;
+            color: var(--txt2); text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .prof-card h3 i { color: var(--p1); }
+
+        .prof-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 9px 0; border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .prof-row:last-child { border: none; }
+        .prof-row .k { color: var(--txt3); }
+        .prof-row .v { font-weight: 800; }
+
+        /* ═══════════════════════════════════════════════
+           АДАПТИВНОСТЬ
+        ═══════════════════════════════════════════════ */
+        @media (max-width: 1100px) {
+            .metrics { grid-template-columns: repeat(2,1fr); }
+            .signal-cards { grid-template-columns: 1fr; }
+            .stats-inner { grid-template-columns: repeat(2,1fr); }
+            .stat-item:nth-child(2) { border-right: none; }
+            .stat-item:nth-child(3) { border-right: 1px solid var(--border); }
+        }
+
+        @media (max-width: 900px) {
+            .hero-title { font-size: 2.8rem; }
+            .grid-2, .grid-2-1 { grid-template-columns: 1fr; }
+            .prof-grid { grid-template-columns: 1fr; }
+            .nav-center { display: none; }
+            .prof-hero { flex-direction: column; text-align: center; }
+            .prof-meta { justify-content: center; }
+        }
+
+        @media (max-width: 680px) {
+            .hero-title { font-size: 2.1rem; letter-spacing: -1px; }
+            .hero-inner { padding: 60px 20px 50px; }
+            .signals-section, .cta-section { padding: 48px 20px; }
+            .dash-wrap, .hist-wrap, .prof-wrap { padding: 16px 16px 40px; }
+            .metrics { grid-template-columns: 1fr 1fr; }
+            .auth-card { padding: 28px 22px; }
+            .navbar { padding: 0 16px; }
+            .cta-box { padding: 40px 24px; }
+            .cta-box h2 { font-size: 1.6rem; }
+            .stats-inner { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 420px) {
+            .hero-title { font-size: 1.8rem; }
+            .metrics { grid-template-columns: 1fr; }
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<script>
+async function sendToAI(pulse, emg, gsr, eeg) {
+    const statusEl = document.getElementById('prescription-status-text');
+    const statusBox = document.getElementById('prescription-status');
+    
+    if (statusEl) statusEl.textContent = '🔄 Анализ данных ИИ...';
+    
+    try {
+        const response = await fetch('http://127.0.0.1:5000/api/analyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pulse, emg, gsr, eeg })
+        });
+        
+        const result = await response.json();
+        
+        // Статус
+        if (statusBox && statusEl) {
+            statusBox.style.background = '#d4edda';
+            statusBox.style.borderColor = '#28a745';
+            statusEl.textContent = '✅ Диагноз получен';
+            statusEl.style.color = '#155724';
+        }
+        
+        // Показатели
+        document.getElementById('pr-pulse').textContent = pulse;
+        document.getElementById('pr-emg').textContent = emg;
+        document.getElementById('pr-gsr').textContent = gsr;
+        document.getElementById('pr-eeg').textContent = eeg;
+        
+        // Нормы
+        const norms = {
+            "Норма": "Пульс 62-82 | ЭМГ 5-22% | КГР 8-25% | ЭЭГ 30-55%",
+            "Напряжение": "Пульс 80-98 | ЭМГ 30-60% | КГР 18-42% | ЭЭГ 50-72%",
+            "Утомление": "ЭЭГ↓ (12-38%) | КГР↑ (20-50%) | Пульс 68-88",
+            "Восстановление": "Пульс 52-68 | ЭМГ 2-12% | КГР 2-14% | ЭЭГ 10-32%",
+            "Стресс": "Пульс 95-115 | ЭМГ 48-88% | КГР 40-82% | ЭЭГ 62-92%",
+            "Перегрузка": "Пульс 105-140 | ВСЁ на максимуме"
+        };
+        
+        const stateClean = (result.name || '').replace(/[🟢🟡🔵💜🟠🔴⛔]\s*/, '');
+        const normText = norms[stateClean] || '';
+        const normBlock = document.getElementById('pr-norm-block');
+        if (normText) {
+            normBlock.style.display = 'block';
+            document.getElementById('pr-norm').textContent = normText;
+        } else {
+            normBlock.style.display = 'none';
+        }
+        
+        // Диагноз
+        document.getElementById('pr-icon').textContent = result.icon || '🤔';
+        document.getElementById('pr-state').textContent = result.name || '—';
+        document.getElementById('pr-state').style.color = result.color || '#333';
+        document.getElementById('pr-confidence').textContent = 'Уверенность модели: ' + (result.confidence || '?') + '%';
+                // Вероятности (топ-3) — с цветными барами
+        if (result.probabilities) {
+            const probs = result.probabilities;
+            const sorted = Object.entries(probs).sort((a, b) => b[1] - a[1]);
+            const top3 = sorted.slice(0, 3);
+            
+            const stateColors = {
+                "Норма": "#2ecc71",
+                "Напряжение": "#f1c40f",
+                "Утомление": "#3498db",
+                "Восстановление": "#9b59b6",
+                "Стресс": "#e67e22",
+                "Перегрузка": "#e74c3c",
+                "Тахикардия": "#f1c40f",
+                "Брадикардия": "#e67e22",
+                "АСИСТОЛИЯ": "#c0392b"
+            };
+            
+            let probHTML = '';
+            for (const [name, pct] of top3) {
+                const filled = Math.round(pct / 5);
+                const empty = 20 - filled;
+                const bar = '█'.repeat(filled) + '░'.repeat(empty);
+                const color = stateColors[name] || '#8890b5';
+                probHTML += `<span style="color:${color};font-weight:700;">${name}: ${pct}%</span> [${bar}]\n`;
+            }
+            
+            document.getElementById('pr-probabilities').innerHTML = probHTML;
+            document.getElementById('pr-probabilities-block').style.display = 'block';
+        } else {
+            document.getElementById('pr-probabilities-block').style.display = 'none';
+        }
+        // Рекомендации
+        const advice = result.advice || '';
+        document.getElementById('pr-advice').innerHTML = advice.replace(/\n/g, '<br>');
+        
+        // Дата
+        document.getElementById('pr-date').textContent = new Date().toLocaleDateString('ru-RU');
+        
+        // Диагноз в бланке
+        document.getElementById('pr-diagnosis-text').textContent = stateClean;
+        
+        // Рецепт (снадобья)
+        const recipe = result.recipe || '—';
+        document.getElementById('pr-recipe').textContent = recipe;
+        
+        // Врач
+        const doctor = result.doctor || '';
+        const doctorCard = document.getElementById('pr-doctor-card');
+        if (doctor) {
+            doctorCard.style.display = 'block';
+            document.getElementById('pr-doctor').textContent = doctor;
+        } else {
+            doctorCard.style.display = 'none';
+        }
+        
+        // Скорая
+        const ambulance = result.ambulance || '';
+        const ambulanceCard = document.getElementById('pr-ambulance-card');
+        if (ambulance) {
+            ambulanceCard.style.display = 'block';
+            document.getElementById('pr-ambulance').innerHTML = ambulance.replace(/\n/g, '<br>');
+        } else {
+            ambulanceCard.style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+        if (statusBox && statusEl) {
+            statusBox.style.background = '#ffebee';
+            statusBox.style.borderColor = '#f44336';
+            statusEl.textContent = '❌ Сервер ИИ недоступен. Запустите server.py';
+            statusEl.style.color = '#b71c1c';
+        }
+    }
+}
+</script>
+
+<body>
+
+<!-- ═══════════════════════════════════════════
+     ТОСТЫ
+═══════════════════════════════════════════ -->
+<div class="toast-wrap" id="toasts"></div>
+
+<!-- ═══════════════════════════════════════════
+     НАВИГАЦИЯ
+═══════════════════════════════════════════ -->
+<nav class="navbar">
+    <span class="nav-brand" onclick="go('landing')">
+        <div class="brand-icon"><i class="fas fa-wave-square"></i></div>
+        Чумной Доктор
+    </span>
+
+    <div class="nav-center hidden" id="navCenter">
+        <button class="nav-btn" id="nb1" onclick="go('dashboard')">
+            <i class="fas fa-chart-line"></i> Мониторинг
+        </button>
+        <button class="nav-btn" id="nb2" onclick="go('prescription')">
+    <i class="fas fa-flask"></i>  Снадобья
+        </button>
+        <button class="nav-btn" id="nb3" onclick="go('history')">
+            <i class="fas fa-clock-rotate-left"></i> История
+        </button>
+        <button class="nav-btn" id="nb4" onclick="go('profile')">
+            <i class="fas fa-user"></i> Профиль
+        </button>
+    </div>
+
+    <div class="nav-right">
+        <div class="nav-guest" id="navGuest">
+            <button class="btn btn-ghost btn-sm" onclick="go('login')">
+                <i class="fas fa-sign-in-alt"></i> Войти
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="go('register')">
+                <i class="fas fa-user-plus"></i> Регистрация
+            </button>
+        </div>
+        <div class="nav-user-block hidden" id="navUser">
+            <div class="nav-user-info">
+                <div class="nav-user-name" id="navName">—</div>
+                <div class="nav-user-role">Пациент</div>
+            </div>
+            <div class="avatar" id="navAva" onclick="go('profile')">A</div>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="doLogout()" title="Выйти">
+                <i class="fas fa-right-from-bracket"></i>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: ГЛАВНАЯ
+═══════════════════════════════════════════ -->
+<div class="page landing active" id="page-landing">
+    <!-- Hero -->
+    <div class="hero-wrap">
+        <div class="hero-deco">
+            <div class="hero-blob blob1"></div>
+            <div class="hero-blob blob2"></div>
+            <div class="hero-blob blob3"></div>
+        </div>
+        <div class="hero-inner">
+            <div class="hero-chip">
+                <span></span>
+                Медицинский мониторинг в реальном времени
+            </div>
+            <h1 class="hero-title">
+                Биосигналы под<br>
+                <span class="line2">полным контролем</span>
+            </h1>
+            <p class="hero-desc">
+                Платформа для мониторинга пульса, ЭМГ и ЭЭГ.
+                Визуализируйте данные датчиков в реальном времени и отслеживайте
+                динамику своего здоровья.
+            </p>
+            <div class="hero-actions">
+                <button class="btn btn-primary btn-xl" onclick="go('register')">
+                    <i class="fas fa-rocket"></i> Начать бесплатно
+                </button>
+                <button class="btn btn-outline btn-xl" onclick="go('login')">
+                    <i class="fas fa-sign-in-alt"></i> Войти в систему
+                </button>
+            </div>
+            <div class="hero-tags">
+                <span class="hero-tag">
+                    <i class="fas fa-shield-check" style="color:var(--ok)"></i>
+                    Безопасно и надёжно
+                </span>
+                <span class="hero-tag">
+                    <i class="fas fa-bolt" style="color:var(--eeg)"></i>
+                    Обновление 20 Гц
+                </span>
+                <span class="hero-tag">
+                    <i class="fas fa-database" style="color:var(--p1)"></i>
+                    Хранение истории
+                </span>
+                <span class="hero-tag">
+                    <i class="fas fa-lock" style="color:var(--pulse)"></i>
+                    Локальные данные
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Карточки сигналов -->
+    <div class="signals-section">
+        <div class="section-label">Возможности системы</div>
+        <h2 class="section-title">Три типа биосигналов</h2>
+        <p class="section-sub">Полный контроль физиологических параметров в одном приложении</p>
+
+        <div class="signal-cards">
+            <!-- Измерение пульса (ранее ЭКГ) -->
+            <div class="signal-card pulse-card">
+                <div class="sc-icon"><i class="fas fa-heart-pulse"></i></div>
+                <div class="sc-abbr">Пульс / ЧСС</div>
+                <div class="sc-title">Измерение пульса</div>
+                <div class="sc-desc">
+                    Непрерывное измерение пульса. Анализ пульсовых волн с автоматическим
+                    расчётом частоты сердечных сокращений (ЧСС) и отображением динамики.
+                </div>
+                <div class="sc-params">
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Пульсовая волна в реальном времени
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Расчёт ЧСС (уд/мин)
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Систолическая и диастолическая фазы
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Частота дискретизации 20 Гц
+                    </div>
+                </div>
+            </div>
+
+            <!-- ЭМГ -->
+            <div class="signal-card emg-card">
+                <div class="sc-icon"><i class="fas fa-bolt"></i></div>
+                <div class="sc-abbr">ЭМГ / EMG</div>
+                <div class="sc-title">Электромиограмма</div>
+                <div class="sc-desc">
+                    Регистрация электрической активности мышц в покое
+                    и при напряжении. Оценка амплитуды сигнала
+                    и выявление мышечных всплесков активности.
+                </div>
+                <div class="sc-params">
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Мышечная активность
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Амплитуда сигнала (мкВ)
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Обнаружение всплесков
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Базовый уровень шума
+                    </div>
+                </div>
+            </div>
+
+            <!-- ЭЭГ -->
+            <div class="signal-card eeg-card">
+                <div class="sc-icon"><i class="fas fa-brain"></i></div>
+                <div class="sc-abbr">ЭЭГ / EEG</div>
+                <div class="sc-title">Электроэнцефалограмма</div>
+                <div class="sc-desc">
+                    Мониторинг ритмов мозговой активности.
+                    Раздельная визуализация альфа, бета, тета и дельта
+                    волн со спектральным анализом в реальном времени.
+                </div>
+                <div class="sc-params">
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Альфа-ритм (8–13 Гц)
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Бета-ритм (13–30 Гц)
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Тета-ритм (4–8 Гц)
+                    </div>
+                    <div class="sc-param">
+                        <i class="fas fa-circle-check"></i> Дельта-ритм (0.5–4 Гц)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="stats-section">
+        <div class="stats-inner">
+            <div class="stat-item">
+                <div class="stat-num">20</div>
+                <div class="stat-lbl">Герц обновления данных</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num">4</div>
+                <div class="stat-lbl">Типа биосигналов</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num">5K</div>
+                <div class="stat-lbl">Записей хранится локально</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num">100%</div>
+                <div class="stat-lbl">Конфиденциальность данных(шутка)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+        <div class="cta-box">
+            <div class="cta-inner">
+                <h2>Готовы начать мониторинг?</h2>
+                <p>Создайте аккаунт за 30 секунд и начните отслеживать биосигналы уже сейчас.</p>
+                <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+                    <button class="btn btn-white btn-lg" onclick="go('register')">
+                        <i class="fas fa-user-plus"></i> Создать аккаунт
+                    </button>
+                    <button class="btn btn-white-outline btn-lg" onclick="go('login')">
+                        <i class="fas fa-sign-in-alt"></i> Уже есть аккаунт
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: ВХОД
+═══════════════════════════════════════════ -->
+<div class="page" id="page-login">
+    <div class="auth-wrap">
+        <div class="auth-card">
+            <div class="auth-top">
+                <div class="auth-logo"><i class="fas fa-sign-in-alt"></i></div>
+                <h2>С возвращением</h2>
+                <p>Войдите в систему мониторинга</p>
+            </div>
+
+            <form onsubmit="doLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-user" style="color:var(--p1)"></i> Имя пользователя
+                    </label>
+                    <input class="form-control" id="lUser" type="text"
+                           placeholder="Введите имя пользователя" autocomplete="username">
+                    <div class="field-err" id="lUserErr"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-lock" style="color:var(--p1)"></i> Пароль
+                    </label>
+                    <div class="input-wrap">
+                        <input class="form-control" id="lPass" type="password"
+                               placeholder="Введите пароль" autocomplete="current-password">
+                        <button type="button" class="eye-btn" onclick="togglePw('lPass',this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="field-err" id="lPassErr"></div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:6px;">
+                    <i class="fas fa-sign-in-alt"></i> Войти
+                </button>
+            </form>
+
+            <div class="auth-foot">
+                Нет аккаунта? <a onclick="go('register')">Зарегистрироваться</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: РЕГИСТРАЦИЯ
+═══════════════════════════════════════════ -->
+<div class="page" id="page-register">
+    <div class="auth-wrap">
+        <div class="auth-card" style="max-width:480px;">
+            <div class="auth-top">
+                <div class="auth-logo"><i class="fas fa-user-plus"></i></div>
+                <h2>Создать аккаунт</h2>
+                <p>Быстрая регистрация за 30 секунд</p>
+            </div>
+
+            <!-- Выбор аватара -->
+            <div class="ava-row" id="avaRow">
+                <div class="ava-opt picked"
+                     data-g="linear-gradient(135deg,#6c47ff,#8b6fff)"
+                     onclick="pickAva(this)"
+                     style="background:linear-gradient(135deg,#6c47ff,#8b6fff)">🧑</div>
+                <div class="ava-opt"
+                     data-g="linear-gradient(135deg,#e8365d,#f59e0b)"
+                     onclick="pickAva(this)"
+                     style="background:linear-gradient(135deg,#e8365d,#f59e0b)">👩</div>
+                <div class="ava-opt"
+                     data-g="linear-gradient(135deg,#0ea87a,#4f8aff)"
+                     onclick="pickAva(this)"
+                     style="background:linear-gradient(135deg,#0ea87a,#4f8aff)">👨‍⚕️</div>
+                <div class="ava-opt"
+                     data-g="linear-gradient(135deg,#f59e0b,#ef4444)"
+                     onclick="pickAva(this)"
+                     style="background:linear-gradient(135deg,#f59e0b,#ef4444)">👩‍⚕️</div>
+                <div class="ava-opt"
+                     data-g="linear-gradient(135deg,#10b981,#6c47ff)"
+                     onclick="pickAva(this)"
+                     style="background:linear-gradient(135deg,#10b981,#6c47ff)">🧓</div>
+            </div>
+
+            <form onsubmit="doRegister(event)">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label"><i class="fas fa-id-card" style="color:var(--p1)"></i> Имя</label>
+                        <input class="form-control" id="rFirst" type="text" placeholder="Иван">
+                        <div class="field-err" id="rFirstErr"></div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label"><i class="fas fa-id-card" style="color:var(--p1)"></i> Фамилия</label>
+                        <input class="form-control" id="rLast" type="text" placeholder="Иванов">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:16px;">
+                    <label class="form-label"><i class="fas fa-at" style="color:var(--p1)"></i> Имя пользователя *</label>
+                    <input class="form-control" id="rUser" type="text"
+                           placeholder="ivan_ivanov" autocomplete="username"
+                           oninput="liveUser(this)">
+                    <div class="field-err" id="rUserErr"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="fas fa-envelope" style="color:var(--p1)"></i> Email *</label>
+                    <input class="form-control" id="rEmail" type="email"
+                           placeholder="ivan@example.com" autocomplete="email">
+                    <div class="field-err" id="rEmailErr"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="fas fa-lock" style="color:var(--p1)"></i> Пароль *</label>
+                    <div class="input-wrap">
+                        <input class="form-control" id="rPass" type="password"
+                               placeholder="Минимум 6 символов"
+                               oninput="pwStrength(this.value)"
+                               autocomplete="new-password">
+                        <button type="button" class="eye-btn" onclick="togglePw('rPass',this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="pw-bar"><div class="pw-fill" id="pwFill"></div></div>
+                    <div class="pw-label" id="pwLbl">Введите пароль</div>
+                    <div class="field-err" id="rPassErr"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="fas fa-lock" style="color:var(--p1)"></i> Подтвердите пароль *</label>
+                    <div class="input-wrap">
+                        <input class="form-control" id="rConf" type="password"
+                               placeholder="Повторите пароль" autocomplete="new-password">
+                        <button type="button" class="eye-btn" onclick="togglePw('rConf',this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="field-err" id="rConfErr"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full btn-lg">
+                    <i class="fas fa-user-plus"></i> Зарегистрироваться
+                </button>
+            </form>
+
+            <div class="auth-foot">
+                Уже есть аккаунт? <a onclick="go('login')">Войти</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: ДАШБОРД
+═══════════════════════════════════════════ -->
+<div class="page" id="page-dashboard">
+    <div class="dash-wrap">
+        <div class="dash-head">
+            <div class="dash-head-left">
+                <h1>Мониторинг биосигналов</h1>
+                <p>Реальные данные с ESP32 · частота 20 Гц</p>
+            </div>
+            <div class="dash-controls">
+                <div class="status-pill" id="sPill">
+                    <div class="status-dot" id="sDot"></div>
+                    <span id="sTxt">Остановлено</span>
+                </div>
+                <button class="btn btn-success" id="bStart" onclick="startStream()">
+                    <i class="fas fa-play"></i> Старт
+                </button>
+                <button class="btn btn-danger" id="bStop" onclick="stopStream()" disabled>
+                    <i class="fas fa-stop"></i> Стоп
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="testSave()" style="margin-left:8px;">
+                    <i class="fas fa-floppy-disk"></i> Сохранить запись
+                </button>
+            </div>
+        </div>
+                <!-- Метрики -->
+        <div class="metrics">
+            <div class="m-card pulse-m">
+                <div class="m-card-accent"></div>
+                <div class="m-top">
+                    <span class="m-label">Пульс (ЧСС)</span>
+                    <div class="m-ico"><i class="fas fa-heart-pulse"></i></div>
+                </div>
+                <div class="m-val" id="mHR">--</div>
+                <div class="m-unit">ударов в минуту</div>
+            </div>
+            <div class="m-card emg-m">
+                <div class="m-card-accent"></div>
+                <div class="m-top">
+                    <span class="m-label">Амплитуда ЭМГ</span>
+                    <div class="m-ico"><i class="fas fa-bolt"></i></div>
+                </div>
+                <div class="m-val" id="mAmp">--</div>
+                <div class="m-unit">микровольт</div>
+            </div>
+            <div class="m-card" style="position: relative;">
+                <div class="m-card-accent" style="background: linear-gradient(90deg, #e65100, #f59e0b);"></div>
+                <div class="m-top">
+                    <span class="m-label">КГР (GSR)</span>
+                    <div class="m-ico" style="background: #fff3e0; color: #e65100;"><i class="fas fa-hand-holding-droplet"></i></div>
+                </div>
+                <div class="m-val" id="mGSR" style="color: #e65100;">--</div>
+                <div class="m-unit">процентов</div>
+            </div>
+            <div class="m-card eeg-m">
+                <div class="m-card-accent"></div>
+                <div class="m-top">
+                    <span class="m-label">Альфа-ритм ЭЭГ</span>
+                    <div class="m-ico"><i class="fas fa-brain"></i></div>
+                </div>
+                <div class="m-val" id="mAlpha">--</div>
+                <div class="m-unit">микровольт</div>
+            </div>
+        </div>
+        <!-- График пульса -->
+        <div class="chart-grid grid-1" style="margin-bottom:16px;">
+            <div class="chart-card">
+                <div class="cc-head">
+                    <div>
+                        <div class="cc-title">
+                            <span class="cdot cdot-pulse"></span>
+                            Измерение пульса
+                        </div>
+                        <div class="cc-sub">Пульсовая волна · Систола · Диастола</div>
+                    </div>
+                    <span class="cc-badge">Пульс: <span id="ecgBadge">--</span> уд/мин</span>
+                </div>
+                <div class="chart-box h150"><canvas id="cEcg"></canvas></div>
+            </div>
+        </div>
+
+        <!-- ЭМГ + ЭЭГ -->
+        <div class="chart-grid grid-2" style="margin-bottom:16px;">
+            <div class="chart-card">
+                <div class="cc-head">
+                    <div>
+                        <div class="cc-title">
+                            <span class="cdot cdot-emg"></span>
+                            Электромиограмма (ЭМГ)
+                        </div>
+                        <div class="cc-sub">Мышечная активность</div>
+                    </div>
+                    <span class="cc-badge">Амп: <span id="emgBadge">--</span> мкВ</span>
+                </div>
+                <div class="chart-box h150"><canvas id="cEmg"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="cc-head">
+                    <div>
+                        <div class="cc-title">
+                            <span class="cdot cdot-eeg"></span>
+                            Электроэнцефалограмма (ЭЭГ)
+                        </div>
+                        <div class="cc-sub">Ритмы α · β · θ · δ</div>
+                    </div>
+                </div>
+                <div class="chart-box h150"><canvas id="cEeg"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: РЕЦЕПТ
+═══════════════════════════════════════════ -->
+<div class="page" id="page-prescription">
+    <div style="max-width: 800px; margin: 40px auto; padding: 0 24px;">
+        
+        <!-- Статус -->
+        <div id="prescription-status" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 12px; padding: 14px 20px; margin-bottom: 24px; text-align: center;">
+            <span style="font-weight: 700; color: #856404;" id="prescription-status-text">⏳ Ожидание данных с датчиков...</span>
+        </div>
+        
+        <!-- Карточка: Показатели -->
+        <div style="background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 28px 30px; margin-bottom: 20px; box-shadow: var(--sh1);">
+            <h2 style="margin: 0 0 20px 0; font-size: 1.1rem; font-weight: 800; color: var(--p1); display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-chart-simple"></i> ПОКАЗАТЕЛИ (средние за окно)
+            </h2>
+            <div style="background: var(--bg2); border-radius: 14px; padding: 20px;">
+                <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="width: 80px; font-weight: 700; color: var(--pulse);">ПУЛЬС</span>
+                    <span style="flex: 1; font-size: 1.5rem; font-weight: 900; color: var(--pulse);" id="pr-pulse">--</span>
+                    <span style="color: var(--txt4); font-size: 0.8rem;">уд/мин</span>
+                </div>
+                <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="width: 80px; font-weight: 700; color: var(--emg);">ЭМГ</span>
+                    <span style="flex: 1; font-size: 1.5rem; font-weight: 900; color: var(--emg);" id="pr-emg">--</span>
+                    <span style="color: var(--txt4); font-size: 0.8rem;">%</span>
+                </div>
+                <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="width: 80px; font-weight: 700; color: #e65100;">КГР</span>
+                    <span style="flex: 1; font-size: 1.5rem; font-weight: 900; color: #e65100;" id="pr-gsr">--</span>
+                    <span style="color: var(--txt4); font-size: 0.8rem;">%</span>
+                </div>
+                <div style="display: flex; align-items: center; padding: 8px 0;">
+                    <span style="width: 80px; font-weight: 700; color: var(--eeg);">ЭЭГ</span>
+                    <span style="flex: 1; font-size: 1.5rem; font-weight: 900; color: var(--eeg);" id="pr-eeg">--</span>
+                    <span style="color: var(--txt4); font-size: 0.8rem;">%</span>
+                </div>
+            </div>
+            
+                        <!-- Норма -->
+            <div id="pr-norm-block" style="margin-top: 16px; padding: 14px 18px; background: var(--p4); border-radius: 10px; border-left: 4px solid var(--p1); display: none;">
+                <span style="font-weight: 700; color: var(--p1);">📏 НОРМА:</span>
+                <span id="pr-norm" style="color: var(--txt2); margin-left: 8px;"></span>
+            </div>
+            
+            <!-- Вероятности -->
+            <div id="pr-probabilities-block" style="margin-top: 16px; padding: 16px 18px; background: var(--bg2); border-radius: 10px; border-left: 4px solid #f59e0b; display: none;">
+                <div style="font-weight: 700; color: var(--txt2); margin-bottom: 10px; font-size: 0.85rem;">📈 ВЕРОЯТНОСТИ (топ-3)</div>
+                <div id="pr-probabilities" style="font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--txt); line-height: 2.0; white-space: pre;"></div>
+            </div>
+        </div>
+        
+        <!-- Карточка: Чумной вердикт -->
+        <div style="background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 28px 30px; margin-bottom: 20px; box-shadow: var(--sh1);">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div id="pr-icon" style="font-size: 4rem; margin-bottom: 8px;">🤔</div>
+                <div id="pr-state" style="font-size: 2rem; font-weight: 900; letter-spacing: -0.5px;">Ожидание...</div>
+                <div id="pr-confidence" style="margin-top: 8px; font-size: 0.9rem; color: var(--txt3);"></div>
+                            <!-- Вероятности -->
+            <div id="pr-probabilities-block" style="margin-top: 12px; padding: 12px; background: var(--bg2); border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.85rem; display: none;">
+                <div style="font-weight: 700; color: var(--txt3); margin-bottom: 6px;">📈 ВЕРОЯТНОСТИ (топ-3)</div>
+                <div id="pr-probabilities" style="color: var(--txt2); line-height: 1.8; white-space: pre;"></div>
+            </div>
+            </div>
+            
+            <!-- Рекомендации -->
+            <div style="background: #e8f5e9; border-radius: 12px; padding: 20px; border-left: 4px solid #4caf50;">
+                <h3 style="margin: 0 0 12px 0; font-size: 0.9rem; color: #2e7d32;">💡 РЕКОМЕНДАЦИИ</h3>
+                <div id="pr-advice" style="color: #333; line-height: 1.8; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+        
+        <!-- Карточка: Рецептурный бланк -->
+        <div style="background: var(--surface); border: 2px solid var(--p1); border-radius: var(--r); padding: 0; margin-bottom: 20px; overflow: hidden; box-shadow: var(--sh2);">
+            <!-- Шапка бланка -->
+            <div style="background: linear-gradient(135deg, var(--p1), var(--p2)); padding: 24px; text-align: center; color: #fff;">
+                <div style="font-size: 0.8rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px;">ВЯТГУ — Чумной Доктор</div>
+            </div>
+            
+            <div style="padding: 24px 30px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 0.85rem; color: var(--txt3);">
+                    <span>Дата: <strong id="pr-date" style="color: var(--txt);">—</strong></span>
+                </div>
+                
+                <div style="background: var(--bg2); padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="font-size: 0.8rem; color: var(--txt3); margin-bottom: 4px;">🧪 ЧУМНОЙ ВЕРДИКТ</div>
+                    <div id="pr-diagnosis-text" style="font-size: 1.1rem; font-weight: 700; color: var(--txt);">—</div>
+                </div>
+                
+                                <div style="font-size: 0.8rem; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">🧪 СНАДОБЬЯ</div>
+                <div id="pr-recipe" style="background: #1a1a2e; border: 2px solid #6c47ff; border-radius: 10px; padding: 18px; font-size: 0.85rem; line-height: 1.9; color: #e0d8ff; font-family: 'Courier New', monospace; white-space: pre-wrap;"></div>
+                
+                <!-- Предупреждение -->
+                <div style="margin-top: 20px; padding: 14px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #856404; margin-bottom: 6px;">⚠️ ВАЖНО</div>
+                    <div style="font-size: 0.75rem; color: #856404; line-height: 1.6;">
+                       Система — учебный прототип (ВЯТГУ), не медицинское изделие.<br>
+            Информация справочная. При симптомах опасности — 103/112.<br>
+            Назначение лечения делает только врач!
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Карточка: Врач + Скорая -->
+        <div id="pr-doctor-card" style="background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 24px 30px; margin-bottom: 20px; box-shadow: var(--sh1); display: none;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 44px; height: 44px; background: #e3f2fd; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #2196f3; flex-shrink: 0;"><i class="fas fa-user-doctor"></i></div>
+                <div>
+                    <div style="font-weight: 800; color: #0d47a1; margin-bottom: 6px;">👨‍⚕️ К КАКОМУ ВРАЧУ</div>
+                    <div id="pr-doctor" style="color: var(--txt2); font-size: 0.9rem; line-height: 1.7;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="pr-ambulance-card" style="background: #fff5f5; border: 2px solid #f44336; border-radius: var(--r); padding: 24px 30px; margin-bottom: 20px; display: none;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="font-size: 2rem; flex-shrink: 0;">🚑</div>
+                <div>
+                    <div style="font-weight: 800; color: #b71c1c; margin-bottom: 6px;">КОГДА ВЫЗЫВАТЬ СКОРУЮ</div>
+                    <div id="pr-ambulance" style="color: #c62828; font-size: 0.9rem; line-height: 1.7;"></div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: ИСТОРИЯ
+═══════════════════════════════════════════ -->
+<div class="page" id="page-history">
+    <div class="hist-wrap">
+        <div class="hist-head">
+            <div>
+                <h1 style="font-size:1.7rem;font-weight:900;letter-spacing:-0.5px;">
+                    История измерений
+                </h1>
+                <p style="color:var(--txt3);font-size:0.85rem;margin-top:4px;" id="hSub">—</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="clearHist()">
+                <i class="fas fa-trash"></i> Очистить историю
+            </button>
+        </div>
+        <div class="hist-stats-row" id="hStats"></div>
+        <div id="hContent"></div>
+        <div class="pagination" id="hPages"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: ПРОФИЛЬ
+═══════════════════════════════════════════ -->
+<div class="page" id="page-profile">
+    <div class="prof-wrap">
+        <div class="prof-hero">
+            <div class="prof-ava" id="pAva">A</div>
+            <div class="prof-info">
+                <h2 id="pName">—</h2>
+                <p id="pEmail">—</p>
+                <div class="prof-meta">
+                    <div class="prof-meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span id="pDate">—</span>
+                    </div>
+                    <div class="prof-meta-item">
+                        <i class="fas fa-database"></i>
+                        <span id="pTotal">0 записей</span>
+                    </div>
+                    <div class="prof-meta-item">
+                        <i class="fas fa-circle" style="color:rgba(255,255,255,0.5);font-size:.6rem"></i>
+                        <span>Активен</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="prof-grid">
+            <div class="prof-card">
+                <h3><i class="fas fa-chart-simple"></i> Статистика</h3>
+                <div class="prof-row">
+                    <span class="k">Всего записей</span>
+                    <span class="v" style="color:var(--pulse)" id="psTotal">0</span>
+                </div>
+                <div class="prof-row">
+                    <span class="k">Сеансов мониторинга</span>
+                    <span class="v" id="psSess">0</span>
+                </div>
+                <div class="prof-row">
+                    <span class="k">Средняя ЧСС</span>
+                    <span class="v" style="color:var(--emg)" id="psAvg">--</span>
+                </div>
+                <div class="prof-row">
+                    <span class="k">Максимальная ЧСС</span>
+                    <span class="v" style="color:var(--err)" id="psMax">--</span>
+                </div>
+                <div class="prof-row">
+                    <span class="k">Минимальная ЧСС</span>
+                    <span class="v" style="color:var(--ok)" id="psMin">--</span>
+                </div>
+            </div>
+
+            <div class="prof-card">
+                <h3><i class="fas fa-user-pen"></i> Редактировать профиль</h3>
+                <form onsubmit="saveProf(event)">
+                    <div class="form-group">
+                        <label class="form-label">Полное имя</label>
+                        <input class="form-control" id="peN" type="text" placeholder="Иван Иванов">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" id="peE" type="email">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Дата рождения</label>
+                        <input class="form-control" id="peB" type="date">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="fas fa-save"></i> Сохранить изменения
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+/* ── ХРАНИЛИЩЕ ─────────────────────────────── */
+const DB = {
+    users:    () => JSON.parse(localStorage.getItem('np_users')    || '[]'),
+    setUsers: u  => localStorage.setItem('np_users', JSON.stringify(u)),
+    sess:     () => JSON.parse(localStorage.getItem('np_sess')     || 'null'),
+    setSess:  s  => localStorage.setItem('np_sess', JSON.stringify(s)),
+    delSess:  () => localStorage.removeItem('np_sess'),
+    rows:     () => JSON.parse(localStorage.getItem('np_rows')     || '[]'),
+    setRows:  r  => localStorage.setItem('np_rows', JSON.stringify(r)),
+    addRow:   row => {
+        const r = DB.rows(); r.push(row);
+        if (r.length > 5000) r.splice(0, r.length - 5000);
+        DB.setRows(r);
+    }
+};
+
+/* ── ТОСТЫ ─────────────────────────────────── */
+function toast(msg, type = 'info', ms = 3200) {
+    const ico = { ok:'fa-circle-check', err:'fa-circle-xmark',
+                  info:'fa-circle-info', warn:'fa-triangle-exclamation' };
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.innerHTML = `<i class="fas ${ico[type]}"></i><span>${msg}</span>`;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => { el.classList.add('out'); el.addEventListener('animationend', () => el.remove()); }, ms);
+}
+
+/* ── НАВИГАЦИЯ ─────────────────────────────── */
+const PAGES = ['landing','login','register','dashboard','history','profile','prescription'];
+
+function go(name) {
+    // переключение страниц
+    PAGES.forEach(p =>
+        document.getElementById(`page-${p}`).classList.toggle('active', p === name)
+    );
+
+    // 🔥 СНАЧАЛА убираем active у всех кнопок
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // потом ставим только нужной
+    const map = {
+        dashboard: 'nb1',
+        prescription: 'nb2',
+        history: 'nb3',
+        profile: 'nb4'
+    };
+
+    if (map[name]) {
+        document.getElementById(map[name])?.classList.add('active');
+    }
+
+    // остальная логика
+    if (name === 'dashboard') initDash();
+    if (name === 'history')   renderHist();
+    if (name === 'profile')   renderProf();
+    if (name === 'prescription') updateAIDiagnosis();
+
+    window.scrollTo(0, 0);
+}
+
+/* ── УТИЛИТЫ ───────────────────────────────── */
+function togglePw(id, btn) {
+    const f = document.getElementById(id), on = f.type === 'password';
+    f.type = on ? 'text' : 'password';
+    btn.querySelector('i').className = on ? 'fas fa-eye-slash' : 'fas fa-eye';
+}
+
+function setErr(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle('show', !!msg);
+}
+
+function clrErr(...ids) { ids.forEach(id => setErr(id, '')); }
+
+function liveUser(inp) {
+    const ok = /^[a-zA-Z0-9_]{3,}$/.test(inp.value);
+    inp.classList.toggle('ok',  ok && inp.value.length > 0);
+    inp.classList.toggle('err', !ok && inp.value.length > 0);
+}
+
+const PW = [
+    { w:'0%',   c:'transparent', l:'Введите пароль'  },
+    { w:'20%',  c:'#ef4444',     l:'Очень слабый'    },
+    { w:'40%',  c:'#f97316',     l:'Слабый'          },
+    { w:'60%',  c:'#eab308',     l:'Средний'         },
+    { w:'80%',  c:'#22c55e',     l:'Хороший'         },
+    { w:'100%', c:'#10b981',     l:'Отличный'        },
+];
+
+function pwStrength(v) {
+    let s = 0;
+    if (v.length >= 6)          s++;
+    if (v.length >= 10)         s++;
+    if (/[A-Z]/.test(v))        s++;
+    if (/[0-9]/.test(v))        s++;
+    if (/[^A-Za-z0-9]/.test(v)) s++;
+    const lv = v ? PW[s] : PW[0];
+    const f = document.getElementById('pwFill'), l = document.getElementById('pwLbl');
+    if (f) { f.style.width = lv.w; f.style.background = lv.c; }
+    if (l) { l.textContent = lv.l; l.style.color = lv.c || 'var(--txt4)'; }
+}
+
+let selAva = { g: 'linear-gradient(135deg,#6c47ff,#8b6fff)', e: '🧑' };
+
+function pickAva(el) {
+    document.querySelectorAll('.ava-opt').forEach(a => a.classList.remove('picked'));
+    el.classList.add('picked');
+    selAva = { g: el.dataset.g, e: el.textContent.trim() };
+}
+
+function set(id, v, d = 4) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (v !== null && v !== undefined) ? (+v).toFixed(d) : '--';
+}
+
+function txt(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v ?? '--';
+}
+
+function fmtDt(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU');
+}
+
+/* ── АУТЕНТИФИКАЦИЯ ────────────────────────── */
+function doRegister(e) {
+    e.preventDefault();
+    const first = document.getElementById('rFirst').value.trim();
+    const last  = document.getElementById('rLast').value.trim();
+    const user  = document.getElementById('rUser').value.trim();
+    const email = document.getElementById('rEmail').value.trim();
+    const pass  = document.getElementById('rPass').value;
+    const conf  = document.getElementById('rConf').value;
+
+    clrErr('rFirstErr','rUserErr','rEmailErr','rPassErr','rConfErr');
+    let ok = true;
+
+    if (!first)                               { setErr('rFirstErr','Введите имя'); ok = false; }
+    if (!/^[a-zA-Z0-9_]{3,}$/.test(user))    { setErr('rUserErr','Минимум 3 символа: буквы, цифры, _'); ok = false; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('rEmailErr','Некорректный email'); ok = false; }
+    if (pass.length < 6)                      { setErr('rPassErr','Минимум 6 символов'); ok = false; }
+    if (pass !== conf)                        { setErr('rConfErr','Пароли не совпадают'); ok = false; }
+    if (!ok) return;
+
+    const users = DB.users();
+    if (users.find(u => u.username === user))  { setErr('rUserErr','Имя уже занято'); return; }
+    if (users.find(u => u.email === email))    { setErr('rEmailErr','Email уже зарегистрирован'); return; }
+
+    const nu = { id: Date.now(), first, last, username: user, email,
+                 pass, avatar: { ...selAva }, createdAt: new Date().toISOString(),
+                 sessions: 0, birthDate: '' };
+    users.push(nu);
+    DB.setUsers(users);
+    toast('Регистрация прошла успешно!', 'ok');
+    go('login');
+    document.getElementById('lUser').value = user;
+}
+
+function doLogin(e) {
+    e.preventDefault();
+    const user = document.getElementById('lUser').value.trim();
+    const pass = document.getElementById('lPass').value;
+    clrErr('lUserErr','lPassErr');
+    if (!user) { setErr('lUserErr','Введите имя пользователя'); return; }
+    if (!pass) { setErr('lPassErr','Введите пароль'); return; }
+    const u = DB.users().find(x => x.username === user && x.pass === pass);
+    if (!u) { setErr('lPassErr','Неверные учётные данные'); toast('Ошибка входа','err'); return; }
+    const all = DB.users();
+    const idx = all.findIndex(x => x.id === u.id);
+    all[idx].sessions = (all[idx].sessions || 0) + 1;
+    DB.setUsers(all);
+    DB.setSess({ uid: u.id });
+    applyNav(u);
+    toast(`Добро пожаловать, ${u.first || u.username}!`, 'ok');
+    go('dashboard');
+}
+
+function doLogout() {
+    stopStream();
+    DB.delSess();
+    applyNav(null);
+    toast('Вы вышли из системы', 'info');
+    go('landing');
+}
+
+function curUser() {
+    const s = DB.sess(); if (!s) return null;
+    return DB.users().find(u => u.id === s.uid) || null;
+}
+
+function applyNav(user) {
+    const auth = !!user;
+    document.getElementById('navGuest').classList.toggle('hidden', auth);
+    document.getElementById('navCenter').classList.toggle('hidden', !auth);
+    document.getElementById('navUser').classList.toggle('hidden', !auth);
+    if (auth) {
+        const letter = (user.first || user.username || 'U')[0].toUpperCase();
+        txt('navName', [user.first, user.last].filter(Boolean).join(' ') || user.username);
+        const ava = document.getElementById('navAva');
+        ava.textContent = letter;
+        ava.style.background = user.avatar?.g || 'var(--p1)';
+    }
+}
+
+function saveProf(e) {
+    e.preventDefault();
+    const user = curUser(); if (!user) return;
+    const name  = document.getElementById('peN').value.trim();
+    const email = document.getElementById('peE').value.trim();
+    const birth = document.getElementById('peB').value;
+    const all   = DB.users();
+    const idx   = all.findIndex(u => u.id === user.id);
+    if (idx === -1) return;
+    if (name) { const p = name.split(' '); all[idx].first = p[0]; all[idx].last = p.slice(1).join(' '); }
+    if (email) all[idx].email = email;
+    if (birth) all[idx].birthDate = birth;
+    DB.setUsers(all);
+    applyNav(all[idx]);
+    toast('Профиль сохранён', 'ok');
+    renderProf();
+}
+
+/* ── ПРИЁМ РЕАЛЬНЫХ ДАННЫХ (вместо Sim) ────────── */
+let lastSentToAI = 0; // чтобы не спамить ИИ
+
+function pushRealData(data) {
+    if (!data || !data.pulse) return;
+    
+    const ts = new Date(data.timestamp || Date.now()).toLocaleTimeString('ru-RU');
+    
+    // Нормализуем для графиков
+    const pulseVal = data.pulse / 200;  // шкала 0-200
+    const emgVal = data.emg / 100;      // шкала 0-100
+    const eegVal = data.eeg / 100;      // шкала 0-100
+    const gsrVal = data.gsr || 0;       // КГР
+    
+    // Обновляем метрики (добавлен КГР!)
+    set('mHR', data.pulse, 0);
+    set('ecgBadge', data.pulse, 1);
+    set('mAmp', data.emg, 1);
+    set('emgBadge', data.emg, 2);
+    set('mGSR', gsrVal, 1);
+    set('mAlpha', eegVal * 0.5, 4);
+    
+    // Обновляем графики
+    if (C.pulse) push1(C.pulse, pulseVal, ts);
+    if (C.emg)   push1(C.emg, emgVal, ts);
+    if (C.eeg) push1(C.eeg, eegVal, ts);
+    
+    // Обновляем таблицу
+    set('vEr', pulseVal, 4);
+    set('vHR', data.pulse, 1);
+    set('vMr', emgVal, 4);
+    set('vMa', data.emg, 2);
+    set('vA', eegVal*0.5, 4);
+    set('vB', eegVal*0.3, 4);
+    set('vT', eegVal*0.15, 4);
+    set('vD', eegVal*0.05, 4);
+    
+    // Сохраняем lastSensorData для совместимости
+    lastSensorData = {
+        pulse: { value: pulseVal, heart_rate: data.pulse },
+        emg: { value: emgVal, amplitude: data.emg },
+        eeg: { alpha: eegVal*0.5, beta: eegVal*0.3, theta: eegVal*0.15, delta: eegVal*0.05 }
+    };
+    
+    // Отправляем в ИИ раз в 3 секунды
+    if (Date.now() - lastSentToAI > 3000) {
+        lastSentToAI = Date.now();
+        if (document.getElementById('page-prescription')?.classList.contains('active')) {
+            sendToAI(data.pulse, data.emg, data.gsr, data.eeg);
+        }
+    }
+    // Отправка в ИИ раз в 3 секунды
+    if (Date.now() - lastSentToAI > 3000) {
+        lastSentToAI = Date.now();
+        const hr = data.pulse || 0;
+        const emg = data.emg || 0;
+        const gsr = data.gsr || 0;
+        const eeg = data.eeg || 0;
+        sendToAI(hr, emg, gsr, eeg);
+    }
+}
+
+function startStream() {
+    if (streamTmr) return;
+    pts = 0; saveTmr = 0;
+    setLive(true);
+    
+    streamTmr = setInterval(() => {
+        const ts = new Date().toLocaleTimeString('ru-RU');
+        
+        // 🔥 ПРИОРИТЕТ: реальные данные с ESP32
+        if (window.realSensorData && window.realSensorData.pulse > 0) {
+            const pulseVal = window.realSensorData.pulse / 200;
+            const emgVal = window.realSensorData.emg / 100;
+            const eegVal = window.realSensorData.eeg / 100;
+            
+            // Графики
+            if (C.pulse) push1(C.pulse, pulseVal, ts);
+            if (C.emg) push1(C.emg, emgVal, ts);
+            if (C.eeg) push1(C.eeg, eegVal, ts);
+            
+            // Метрики
+            set('mHR', window.realSensorData.pulse, 0);
+            set('ecgBadge', window.realSensorData.pulse, 1);
+            set('mAmp', window.realSensorData.emg, 1);
+            set('emgBadge', window.realSensorData.emg, 2);
+            set('mGSR', window.realSensorData.gsr, 1);
+            set('mAlpha', window.realSensorData.eeg * 0.5, 4);
+            set('vEr', pulseVal, 4);
+            set('vHR', window.realSensorData.pulse, 1);
+            set('vMr', emgVal, 4);
+            set('vMa', window.realSensorData.emg, 2);
+            set('vA', eegVal*0.5, 4);
+            set('vB', eegVal*0.3, 4);
+            set('vT', eegVal*0.15, 4);
+            set('vD', eegVal*0.05, 4);
+            
+            // lastSensorData для ИИ
+            lastSensorData = {
+                pulse: { value: pulseVal, heart_rate: window.realSensorData.pulse },
+                emg: { value: emgVal, amplitude: window.realSensorData.emg },
+                eeg: { alpha: eegVal*0.5, beta: eegVal*0.3, theta: eegVal*0.15, delta: eegVal*0.05 }
+            };
+        } else {
+            // Нет реальных данных — показываем нули
+            if (C.pulse) push1(C.pulse, 0, ts);
+            if (C.emg) push1(C.emg, 0, ts);
+            if (C.eeg) push1(C.eeg, 0, ts);
+            
+            set('mHR', 0, 0);
+            set('ecgBadge', 0, 1);
+            set('mAmp', 0, 1);
+            set('mGSR', 0, 1);
+            set('mAlpha', 0, 4);
+        }
+        
+        pts++;
+        document.getElementById('mPts').textContent = pts;
+        
+                // Сохранение в историю — УБРАНО, теперь в saveCurrentData()
+    }, 50);
+}
+
+function updateAIDiagnosisReal() {
+    if (!window.realSensorData) {
+        updateAIDiagnosis(); // фоллбэк
+        return;
+    }
+    sendToAI(
+        window.realSensorData.pulse,
+        window.realSensorData.emg,
+        window.realSensorData.gsr,
+        window.realSensorData.eeg
+    );
+}
+
+/* ── ГРАФИКИ ───────────────────────────────── */
+const MAX = 200;
+let C = {};
+let streamTmr = null, pts = 0, saveTmr = 0;
+let dashReady = false;
+let lastSensorData = null; // для ИИ-диагноза
+
+const GRID = 'rgba(226,230,243,0.8)';
+const TICK = '#b8bdd8';
+
+function lineOpts(color) {
+    return {
+        type: 'line',
+        data: { labels: [], datasets: [{ data: [], borderColor: color,
+            backgroundColor: color + '18', borderWidth: 2,
+            pointRadius: 0, tension: 0.15, fill: true }] },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { backgroundColor: '#fff', borderColor: '#e2e6f3', borderWidth: 1,
+                    titleColor: '#4a5080', bodyColor: '#1a1d2e',
+                    callbacks: { label: c => ` ${c.parsed.y.toFixed(4)}` } }
+            },
+            scales: {
+                x: { display: false },
+                y: { grid: { color: GRID, drawBorder: false },
+                     ticks: { color: TICK, font:{size:10}, maxTicksLimit:4, callback: v => v.toFixed(2) },
+                     border: { display: false } }
+            }
+        }
+    };
+}
+
+function initDash() {
+    if (dashReady) return;
+    dashReady = true;
+
+    C.pulse = new Chart(document.getElementById('cEcg').getContext('2d'), lineOpts('#e8365d'));
+    C.emg = new Chart(document.getElementById('cEmg').getContext('2d'), lineOpts('#0ea87a'));
+    C.eeg = new Chart(document.getElementById('cEeg').getContext('2d'), lineOpts('#f59e0b'));
+}
+
+function push1(ch, v, lbl) {
+    const d = ch.data;
+    if (d.labels.length >= MAX) { d.labels.shift(); d.datasets[0].data.shift(); }
+    d.labels.push(lbl); d.datasets[0].data.push(v); ch.update('none');
+}
+
+function pushN(ch, vals, lbl) {
+    const d = ch.data;
+    if (d.labels.length >= MAX) { d.labels.shift(); d.datasets.forEach(ds => ds.data.shift()); }
+    d.labels.push(lbl); vals.forEach((v,i) => d.datasets[i]?.data.push(v)); ch.update('none');
+}
+
+/* ── СТРИМ ─────────────────────────────────── */
+
+
+function stopStream() {
+    if (streamTmr) { clearInterval(streamTmr); streamTmr = null; }
+    setLive(false);
+}
+
+function setLive(on) {
+    const pill = document.getElementById('sPill');
+    const bs   = document.getElementById('bStart');
+    const bst  = document.getElementById('bStop');
+    if (!pill) return;
+    pill.classList.toggle('live', on);
+    
+    if (on && !window.realSensorData) {
+        document.getElementById('sTxt').textContent = 'Ожидание данных с ESP32...';
+        document.getElementById('sDot').style.background = '#f59e0b';
+    } else if (on && window.realSensorData && window.realSensorData.pulse > 0) {
+        document.getElementById('sTxt').textContent = 'Идёт запись (реальные данные)';
+        document.getElementById('sDot').style.background = '#10b981';
+    } else if (on) {
+        document.getElementById('sTxt').textContent = 'Ожидание данных...';
+        document.getElementById('sDot').style.background = '#f59e0b';
+    } else {
+        document.getElementById('sTxt').textContent = 'Остановлено';
+        document.getElementById('sDot').style.background = '#e2e6f3';
+    }
+    
+    if (bs)  bs.disabled = on;
+    if (bst) bst.disabled = !on;
+}
+
+/* ── ИСТОРИЯ ───────────────────────────────── */
+let hPage = 1;
+const HPP  = 15;
+
+function renderHist() {
+    const u = curUser(); if (!u) return;
+    const all = DB.rows().filter(r => r.uid === u.id);
+    txt('hSub', `Всего записей: ${all.length}`);
+    renderHStats(all);
+    if (!all.length) {
+        document.getElementById('hContent').innerHTML = `
+            <div class="empty">
+                <div class="empty-ico"><i class="fas fa-chart-simple"></i></div>
+                <h3>Нет данных</h3>
+                <p>Запустите мониторинг, чтобы здесь появились записи.</p>
+                <button class="btn btn-primary" onclick="go('dashboard')">
+                    <i class="fas fa-play"></i> Начать мониторинг
+                </button>
+            </div>`;
+        document.getElementById('hPages').innerHTML = '';
+        return;
+    }
+    const tot   = Math.ceil(all.length / HPP);
+    hPage       = Math.min(hPage, tot);
+    const rev   = all.slice().reverse();
+    const chunk = rev.slice((hPage-1)*HPP, hPage*HPP);
+
+    document.getElementById('hContent').innerHTML = `
+        <div class="tbl-wrap">
+            <table class="data-tbl">
+                <thead><tr>
+                    <th>Время</th>
+                    <th><span class="tag tag-pulse">Пульс</span>Сигнал</th>
+                    <th><span class="tag tag-pulse">Пульс</span>ЧСС</th>
+                    <th><span class="tag tag-emg">ЭМГ</span>Сигнал</th>
+                    <th><span class="tag tag-emg">ЭМГ</span>Амп.</th>
+                    <th><span class="tag tag-eeg">ЭЭГ</span>α</th>
+                    <th><span class="tag tag-eeg">ЭЭГ</span>β</th>
+                    <th><span class="tag tag-eeg">ЭЭГ</span>θ</th>
+                    <th><span class="tag tag-eeg">ЭЭГ</span>δ</th>
+                </tr></thead>
+                <tbody>${chunk.map(r => {
+    const pv = (r.pulse && r.pulse.value != null) ? r.pulse.value : 0;
+    const phr = (r.pulse && r.pulse.heart_rate != null) ? r.pulse.heart_rate : 0;
+    const ev = (r.emg && r.emg.value != null) ? r.emg.value : 0;
+    const ea = (r.emg && r.emg.amplitude != null) ? r.emg.amplitude : 0;
+    const a = (r.eeg && r.eeg.alpha != null) ? r.eeg.alpha : 0;
+    const b = (r.eeg && r.eeg.beta != null) ? r.eeg.beta : 0;
+    const t = (r.eeg && r.eeg.theta != null) ? r.eeg.theta : 0;
+    const d = (r.eeg && r.eeg.delta != null) ? r.eeg.delta : 0;
+    return `
+    <tr>
+        <td class="tc">${fmtDt(r.ts)}</td>
+        <td style="color:var(--pulse)">${pv.toFixed(4)}</td>
+        <td style="color:var(--pulse);font-weight:800">${phr.toFixed(1)}</td>
+        <td style="color:var(--emg)">${ev.toFixed(4)}</td>
+        <td style="color:var(--emg);font-weight:800">${ea.toFixed(2)}</td>
+        <td style="color:#b45309">${a.toFixed(4)}</td>
+        <td style="color:#7c3aed">${b.toFixed(4)}</td>
+        <td style="color:#0369a1">${t.toFixed(4)}</td>
+        <td style="color:#be123c">${d.toFixed(4)}</td>
+    </tr>`;
+}).join('')}
+</tbody>
+            </table>
+        </div>`;
+
+    if (tot <= 1) { document.getElementById('hPages').innerHTML = ''; return; }
+    let pg = `
+        <button class="pg-btn" onclick="hGo(1)" ${hPage===1?'disabled':''}>
+            <i class="fas fa-angles-left"></i></button>
+        <button class="pg-btn" onclick="hGo(${hPage-1})" ${hPage===1?'disabled':''}>
+            <i class="fas fa-angle-left"></i></button>`;
+    for (let i = Math.max(1,hPage-2); i <= Math.min(tot,hPage+2); i++)
+        pg += `<button class="pg-btn ${i===hPage?'cur':''}" onclick="hGo(${i})">${i}</button>`;
+    pg += `
+        <button class="pg-btn" onclick="hGo(${hPage+1})" ${hPage===tot?'disabled':''}>
+            <i class="fas fa-angle-right"></i></button>
+        <button class="pg-btn" onclick="hGo(${tot})" ${hPage===tot?'disabled':''}>
+            <i class="fas fa-angles-right"></i></button>`;
+    document.getElementById('hPages').innerHTML = pg;
+}
+
+function hGo(p) { hPage = p; renderHist(); window.scrollTo(0,0); }
+
+function renderHStats(all) {
+    const cont = document.getElementById('hStats');
+    if (!all.length) { cont.innerHTML = ''; return; }
+    const hrs = all.map(r => (r.pulse && r.pulse.heart_rate != null) ? r.pulse.heart_rate : 0).filter(v => v > 0);
+if (hrs.length === 0) { cont.innerHTML = ''; return; }
+const avg = (hrs.reduce((a,b)=>a+b,0)/hrs.length).toFixed(1);
+    cont.innerHTML = `
+        <div class="hstat">
+            <div class="hstat-l">Всего записей</div>
+            <div class="hstat-v" style="color:var(--pulse)">${all.length}</div>
+        </div>
+        <div class="hstat">
+            <div class="hstat-l">Средняя ЧСС</div>
+            <div class="hstat-v" style="color:var(--emg)">${avg} уд/мин</div>
+        </div>
+        <div class="hstat">
+            <div class="hstat-l">Макс. ЧСС</div>
+            <div class="hstat-v" style="color:var(--err)">${Math.max(...hrs).toFixed(1)}</div>
+        </div>
+        <div class="hstat">
+            <div class="hstat-l">Мин. ЧСС</div>
+            <div class="hstat-v" style="color:var(--ok)">${Math.min(...hrs).toFixed(1)}</div>
+        </div>`;
+}
+
+function clearHist() {
+    const u = curUser(); if (!u) return;
+    if (!confirm('Удалить всю историю измерений?')) return;
+    DB.setRows(DB.rows().filter(r => r.uid !== u.id));
+    toast('История очищена', 'info');
+    hPage = 1; renderHist();
+}
+
+/* ── ПРОФИЛЬ ───────────────────────────────── */
+function renderProf() {
+    const u = curUser(); if (!u) return;
+    const name = [u.first, u.last].filter(Boolean).join(' ') || u.username;
+    const all  = DB.rows().filter(r => r.uid === u.id);
+    const ava  = document.getElementById('pAva');
+    if (ava) {
+        ava.textContent = (u.first || u.username || 'U')[0].toUpperCase();
+        ava.style.background = u.avatar?.g || 'var(--p1)';
+    }
+    txt('pName',  name);
+    txt('pEmail', u.email);
+    txt('pDate',  'Зарегистрирован: ' + fmtDt(u.createdAt));
+    txt('pTotal', `${all.length} записей`);
+    txt('psTotal', all.length);
+    txt('psSess',  u.sessions || 0);
+    if (all.length) {
+        const hrs = all.map(r => (r.pulse && r.pulse.heart_rate != null) ? r.pulse.heart_rate : 0).filter(v => v > 0);
+if (hrs.length === 0) return;
+        txt('psAvg', (hrs.reduce((a,b)=>a+b,0)/hrs.length).toFixed(1) + ' уд/мин');
+        txt('psMax', Math.max(...hrs).toFixed(1) + ' уд/мин');
+        txt('psMin', Math.min(...hrs).toFixed(1) + ' уд/мин');
+    }
+    const ne = document.getElementById('peN');
+    const ee = document.getElementById('peE');
+    const be = document.getElementById('peB');
+    if (ne) ne.value = name;
+    if (ee) ee.value = u.email;
+    if (be) be.value = u.birthDate || '';
+}
+
+/* ── ИИ ДИАГНОЗ (обновление блока) ────────── */
+function updateAIDiagnosis() {
+    // 🔥 Приоритет: реальные данные с ESP32
+    if (window.realSensorData && window.realSensorData.pulse > 0) {
+        sendToAI(
+            window.realSensorData.pulse,
+            window.realSensorData.emg,
+            window.realSensorData.gsr,
+            window.realSensorData.eeg
+        );
+        return;
+    }
+    
+    // Фоллбэк: последние сохранённые данные
+    const user = curUser();
+    if (user) {
+        const allRows = DB.rows().filter(r => r.uid === user.id);
+        if (allRows.length) {
+            const data = allRows[allRows.length-1];
+            const hr = data.pulse?.heart_rate || 0;
+            const emgAmp = data.emg?.amplitude || 0;
+            const alpha = Math.abs(data.eeg?.alpha || 0);
+            const beta = Math.abs(data.eeg?.beta || 0);
+            sendToAI(hr, emgAmp, alpha * 100, beta * 100);
+            return;
+        }
+    }
+    
+    // Нет данных
+    document.getElementById('ai-diagnosis').innerHTML = '⏳ Нет данных для анализа';
+    document.getElementById('ai-diagnosis').style.color = '#8890b5';
+    document.getElementById('ai-advice').innerHTML = '';
+    document.getElementById('ai-recipe').innerHTML = '';
+    document.getElementById('ai-doctor').innerHTML = '';
+    document.getElementById('ai-ambulance-block').style.display = 'none';
+}
+
+/* ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────── */
+(function() {
+    const s = DB.sess();
+    if (s) {
+        const u = DB.users().find(x => x.id === s.uid);
+        if (u) applyNav(u); else DB.delSess();
+    }
+    window.addEventListener('beforeunload', stopStream);
+})();
+</script>
+<script>
+// ═════════ ПРИЁМ ДАННЫХ ОТ STEP3 (HTTP-опрос) ═════════
+window.realSensorData = null;
+
+let lastSaveTime = 0;
+
+function pollStep3Data() {
+    fetch('http://127.0.0.1:5000/api/realtime')
+        .then(r => r.json())
+        .then(msg => {
+            if (msg && msg.pulse !== undefined && msg.pulse > 0) {
+                window.realSensorData = {
+                    pulse: msg.pulse || 0,
+                    emg: msg.emg || 0,
+                    gsr: msg.gsr || 0,
+                    eeg: msg.eeg || 0,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // 🔥 СОХРАНЕНИЕ В ИСТОРИЮ (раз в 5 секунд)
+                const now = Date.now();
+                if (now - lastSaveTime > 5000) {
+                    lastSaveTime = now;
+                    
+                    const u = curUser();
+                    if (u && window.realSensorData.pulse > 0) {
+                        const d = window.realSensorData;
+                        DB.addRow({
+                            uid: u.id,
+                            ts: d.timestamp,
+                            pulse: { 
+                                value: d.pulse / 200, 
+                                heart_rate: d.pulse 
+                            },
+                            emg: { 
+                                value: d.emg / 100, 
+                                amplitude: d.emg 
+                            },
+                            eeg: { 
+                                alpha: d.eeg * 0.5, 
+                                beta: d.eeg * 0.3, 
+                                theta: d.eeg * 0.15, 
+                                delta: d.eeg * 0.05 
+                            }
+                        });
+                        console.log('💾 Сохранено в историю! Пульс:', d.pulse, 
+                            'Всего записей:', DB.rows().filter(r => r.uid === u.id).length);
+                    }
+                }
+            }
+        })
+        .catch(() => {
+            // Сервер не отвечает — нормально
+        });
+}
+
+// Запускаем опрос каждую секунду
+setInterval(pollStep3Data, 1000);
+pollStep3Data(); // первый запрос сразу
+
+// ═════════ ТЕСТОВАЯ КНОПКА ═════════
+function testSave() {
+    const u = curUser();
+    if (!u) { toast('Сначала войдите!', 'err'); return; }
+    
+    // Если есть реальные данные — сохраняем их
+    if (window.realSensorData && window.realSensorData.pulse > 0) {
+        const d = window.realSensorData;
+        DB.addRow({
+            uid: u.id,
+            ts: d.timestamp || new Date().toISOString(),
+            pulse: { value: d.pulse / 200, heart_rate: d.pulse },
+            emg: { value: d.emg / 100, amplitude: d.emg },
+            eeg: { alpha: d.eeg * 0.5, beta: d.eeg * 0.3, theta: d.eeg * 0.15, delta: d.eeg * 0.05 }
+        });
+        toast('Реальные данные сохранены! Пульс: ' + d.pulse, 'ok');
+    } else {
+        // Иначе тестовые данные
+        DB.addRow({
+            uid: u.id,
+            ts: new Date().toISOString(),
+            pulse: { value: 0.375, heart_rate: 75 },
+            emg: { value: 0.15, amplitude: 15 },
+            eeg: { alpha: 0.2, beta: 0.12, theta: 0.06, delta: 0.02 }
+        });
+        toast('Тестовая запись сохранена!', 'ok');
+    }
+    
+    const total = DB.rows().filter(r => r.uid === u.id).length;
+    console.log('Всего записей пользователя:', total);
+    toast('Всего записей: ' + total, 'info');
+}
+</script>
+</body>
+</html>
+</script>
+</body>
+</html>
