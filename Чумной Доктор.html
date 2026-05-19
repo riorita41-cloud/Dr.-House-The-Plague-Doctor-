@@ -1160,6 +1160,9 @@ async function sendToAI(pulse, emg, gsr, eeg) {
         <button class="nav-btn" id="nb4" onclick="go('profile')">
             <i class="fas fa-user"></i> Профиль
         </button>
+        <button class="nav-btn" id="nb5" onclick="go('admin')" style="border-left:1px solid var(--border);margin-left:6px;padding-left:14px;">
+            <i class="fas fa-cog"></i> Админ
+        </button>
     </div>
 
     <div class="nav-right">
@@ -1675,11 +1678,6 @@ async function sendToAI(pulse, emg, gsr, eeg) {
                 <span id="pr-norm" style="color: var(--txt2); margin-left: 8px;"></span>
             </div>
             
-            <!-- Вероятности -->
-            <div id="pr-probabilities-block" style="margin-top: 16px; padding: 16px 18px; background: var(--bg2); border-radius: 10px; border-left: 4px solid #f59e0b; display: none;">
-                <div style="font-weight: 700; color: var(--txt2); margin-bottom: 10px; font-size: 0.85rem;">📈 ВЕРОЯТНОСТИ (топ-3)</div>
-                <div id="pr-probabilities" style="font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--txt); line-height: 2.0; white-space: pre;"></div>
-            </div>
         </div>
         
         <!-- Карточка: Чумной вердикт -->
@@ -1855,6 +1853,102 @@ async function sendToAI(pulse, emg, gsr, eeg) {
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════
+     СТРАНИЦА: АДМИН-ПАНЕЛЬ
+═══════════════════════════════════════════ -->
+<div class="page" id="page-admin">
+    <div class="dash-wrap">
+        <div class="dash-head">
+            <div class="dash-head-left">
+                <h1><i class="fas fa-cog"></i> Админ-панель</h1>
+                <p>Управление обучением, тестированием и сбором данных</p>
+            </div>
+            <div class="dash-controls">
+                <span class="status-pill" style="background:#e8f0fe;border:1px solid #1967d2;">
+                    <span class="status-dot" id="adminStatusDot" style="background:#34a853;"></span>
+                    <span id="adminStatusTxt">Онлайн</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Карточки управления -->
+        <div class="metrics" style="margin-bottom:24px;">
+            <div class="m-card" style="border-left:4px solid #7c3aed;">
+                <div class="m-top"><span class="m-label">🔄 Обучение</span></div>
+                <div style="padding:8px 0;">
+                    <button class="btn btn-primary btn-full" onclick="adminTrain()" id="btnTrain">
+                        <i class="fas fa-brain"></i> Обучить модель
+                    </button>
+                    <div style="margin-top:8px;font-size:0.75rem;color:var(--txt3);">
+                        <span id="trainStatus">⏳ Ожидание</span>
+                    </div>
+                </div>
+            </div>
+            <div class="m-card" style="border-left:4px solid #0ea5e9;">
+                <div class="m-top"><span class="m-label">🧪 Тестирование</span></div>
+                <div style="padding:8px 0;">
+                    <button class="btn btn-primary btn-full" onclick="adminTest()" id="btnTest" style="background:#0ea5e9;">
+                        <i class="fas fa-vial"></i> Тест модели
+                    </button>
+                    <div style="margin-top:8px;font-size:0.75rem;color:var(--txt3);">
+                        <span id="testStatus">⏳ Ожидание</span>
+                    </div>
+                </div>
+            </div>
+            <div class="m-card" style="border-left:4px solid #059669;">
+                <div class="m-top"><span class="m-label">📡 Реальное время</span></div>
+                <div style="padding:8px 0;">
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-success" onclick="adminRealtimeStart()" id="btnRtStart" style="flex:1;">
+                            <i class="fas fa-play"></i> Старт
+                        </button>
+                        <button class="btn btn-danger" onclick="adminRealtimeStop()" id="btnRtStop" style="flex:1;" disabled>
+                            <i class="fas fa-stop"></i> Стоп
+                        </button>
+                    </div>
+                    <div style="margin-top:8px;font-size:0.75rem;color:var(--txt3);">
+                        <span id="rtStatus">⏹ Остановлено</span>
+                    </div>
+                </div>
+            </div>
+            <div class="m-card" style="border-left:4px solid #d97706;">
+                <div class="m-top"><span class="m-label">📊 Статус модели</span></div>
+                <div style="padding:8px 0;font-size:0.85rem;">
+                    <div id="adminModelInfo">Загрузка...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Логи -->
+        <div class="chart-card">
+            <div class="cc-head">
+                <div>
+                    <div class="cc-title"><i class="fas fa-terminal"></i> Лог операций</div>
+                    <div class="cc-sub">Вывод скриптов обучения / тестирования</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="adminRefreshLogs()">
+                    <i class="fas fa-rotate"></i> Обновить
+                </button>
+            </div>
+            <pre id="adminLog" style="background:#1a1a2e;color:#e0d8ff;padding:16px;border-radius:10px;font-size:0.8rem;line-height:1.6;max-height:400px;overflow-y:auto;font-family:'Courier New',monospace;white-space:pre-wrap;">Лог пуст...</pre>
+        </div>
+        
+        <!-- Информация о системе -->
+        <div class="chart-card" style="margin-top:16px;">
+            <div class="cc-head">
+                <div>
+                    <div class="cc-title"><i class="fas fa-server"></i> Системная информация</div>
+                </div>
+            </div>
+            <div style="padding:8px 0;font-size:0.85rem;line-height:2;">
+                <div class="prof-row"><span class="k">Версия Python</span><span class="v" id="sysPython">—</span></div>
+                <div class="prof-row"><span class="k">Рабочая директория</span><span class="v" id="sysCwd">—</span></div>
+                <div class="prof-row"><span class="k">Файлы проекта</span><span class="v" id="sysFiles">—</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 'use strict';
 
@@ -1886,7 +1980,7 @@ function toast(msg, type = 'info', ms = 3200) {
 }
 
 /* ── НАВИГАЦИЯ ─────────────────────────────── */
-const PAGES = ['landing','login','register','dashboard','history','profile','prescription'];
+const PAGES = ['landing','login','register','dashboard','history','profile','prescription','admin'];
 
 function go(name) {
     // переключение страниц
@@ -1904,7 +1998,8 @@ function go(name) {
         dashboard: 'nb1',
         prescription: 'nb2',
         history: 'nb3',
-        profile: 'nb4'
+        profile: 'nb4',
+        admin: 'nb5'
     };
 
     if (map[name]) {
@@ -1916,6 +2011,7 @@ function go(name) {
     if (name === 'history')   renderHist();
     if (name === 'profile')   renderProf();
     if (name === 'prescription') updateAIDiagnosis();
+    if (name === 'admin') initAdmin();
 
     window.scrollTo(0, 0);
 }
@@ -2202,7 +2298,8 @@ function startStream() {
         }
         
         pts++;
-        document.getElementById('mPts').textContent = pts;
+        const mPtsEl = document.getElementById('mPts');
+        if (mPtsEl) mPtsEl.textContent = pts;
         
                 // Сохранение в историю — УБРАНО, теперь в saveCurrentData()
     }, 50);
@@ -2487,12 +2584,142 @@ function updateAIDiagnosis() {
     }
     
     // Нет данных
-    document.getElementById('ai-diagnosis').innerHTML = '⏳ Нет данных для анализа';
-    document.getElementById('ai-diagnosis').style.color = '#8890b5';
-    document.getElementById('ai-advice').innerHTML = '';
-    document.getElementById('ai-recipe').innerHTML = '';
-    document.getElementById('ai-doctor').innerHTML = '';
-    document.getElementById('ai-ambulance-block').style.display = 'none';
+    const stEl = document.getElementById('pr-state');
+    if (stEl) {
+        stEl.textContent = '⏳ Нет данных для анализа';
+        stEl.style.color = '#8890b5';
+    }
+    const advEl = document.getElementById('pr-advice');
+    if (advEl) advEl.innerHTML = '';
+    const recEl = document.getElementById('pr-recipe');
+    if (recEl) recEl.textContent = '';
+    const docEl = document.getElementById('pr-doctor-card');
+    if (docEl) docEl.style.display = 'none';
+    const ambEl = document.getElementById('pr-ambulance-card');
+    if (ambEl) ambEl.style.display = 'none';
+}
+
+/* ── АДМИН-ПАНЕЛЬ ──────────────────────────── */
+let adminLogTimer = null;
+
+function initAdmin() {
+    if (adminLogTimer) return;
+    document.getElementById('sysPython').textContent = navigator.userAgent.includes('Python') ? 'Python 3.x' : '—';
+    document.getElementById('sysCwd').textContent = window.location.origin;
+    document.getElementById('sysFiles').textContent = 'server.py, step1_train, step2_test, step3_realtime, model_v8.pkl';
+    adminRefreshStatus();
+    adminRefreshLogs();
+    adminLogTimer = setInterval(() => { adminRefreshStatus(); adminRefreshLogs(); }, 5000);
+}
+
+function adminCleanup() {
+    if (adminLogTimer) { clearInterval(adminLogTimer); adminLogTimer = null; }
+}
+
+async function adminRefreshStatus() {
+    try {
+        const r = await fetch('/api/admin/status');
+        const d = await r.json();
+        const info = document.getElementById('adminModelInfo');
+        const rtRunning = d.realtime_running;
+        document.getElementById('btnRtStart').disabled = rtRunning;
+        document.getElementById('btnRtStop').disabled = !rtRunning;
+        document.getElementById('rtStatus').textContent = rtRunning ? '🟢 Запущен' : '⏹ Остановлено';
+        document.getElementById('adminStatusTxt').textContent = 'Онлайн';
+        document.getElementById('adminStatusDot').style.background = '#34a853';
+        
+        if (d.model_loaded) {
+            info.innerHTML = `
+                <div class="prof-row"><span class="k">Модель</span><span class="v" style="color:var(--ok)">✅ Загружена</span></div>
+                <div class="prof-row"><span class="k">Точность</span><span class="v" style="color:var(--p1)">${(d.model_accuracy*100).toFixed(1)}%</span></div>
+                <div class="prof-row"><span class="k">Классы</span><span class="v">${d.classes.join(', ')}</span></div>
+                <div class="prof-row"><span class="k">Признаков</span><span class="v">${d.features} (окно ${d.window_size})</span></div>
+                <div class="prof-row"><span class="k">Uptime</span><span class="v">${d.server_uptime}</span></div>
+            `;
+        } else {
+            info.innerHTML = '<span style="color:var(--err)">❌ Модель не загружена</span>';
+        }
+    } catch(e) {
+        document.getElementById('adminStatusTxt').textContent = 'Ошибка соединения';
+        document.getElementById('adminStatusDot').style.background = '#ef4444';
+    }
+}
+
+async function adminRefreshLogs() {
+    try {
+        const r = await fetch('/api/admin/logs');
+        const d = await r.json();
+        const el = document.getElementById('adminLog');
+        el.textContent = d.logs || 'Лог пуст...';
+        el.scrollTop = el.scrollHeight;
+    } catch(e) {}
+}
+
+async function adminTrain() {
+    const btn = document.getElementById('btnTrain');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обучение...';
+    try {
+        const r = await fetch('/api/admin/train', {method:'POST'});
+        const d = await r.json();
+        document.getElementById('trainStatus').textContent = '🔄 ' + (d.message || 'Запущено');
+        // ждём завершения
+        setTimeout(() => { adminRefreshLogs(); adminRefreshStatus(); }, 2000);
+    } catch(e) {
+        document.getElementById('trainStatus').textContent = '❌ Ошибка: ' + e.message;
+    }
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-brain"></i> Обучить модель';
+        document.getElementById('trainStatus').textContent = '✅ Готово';
+    }, 5000);
+}
+
+async function adminTest() {
+    const btn = document.getElementById('btnTest');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Тестирование...';
+    try {
+        const r = await fetch('/api/admin/test', {method:'POST'});
+        const d = await r.json();
+        document.getElementById('testStatus').textContent = '🔄 ' + (d.message || 'Запущено');
+        setTimeout(() => { adminRefreshLogs(); adminRefreshStatus(); }, 2000);
+    } catch(e) {
+        document.getElementById('testStatus').textContent = '❌ Ошибка: ' + e.message;
+    }
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-vial"></i> Тест модели';
+        document.getElementById('testStatus').textContent = '✅ Готово';
+    }, 5000);
+}
+
+async function adminRealtimeStart() {
+    try {
+        const r = await fetch('/api/admin/realtime/start', {method:'POST'});
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+        document.getElementById('btnRtStart').disabled = true;
+        document.getElementById('btnRtStop').disabled = false;
+        document.getElementById('rtStatus').textContent = '🟢 Запущен (PID: ' + d.pid + ')';
+        adminRefreshLogs();
+    } catch(e) {
+        alert('Ошибка: ' + e.message);
+    }
+}
+
+async function adminRealtimeStop() {
+    try {
+        const r = await fetch('/api/admin/realtime/stop', {method:'POST'});
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+        document.getElementById('btnRtStart').disabled = false;
+        document.getElementById('btnRtStop').disabled = true;
+        document.getElementById('rtStatus').textContent = '⏹ Остановлено';
+        adminRefreshLogs();
+    } catch(e) {
+        alert('Ошибка: ' + e.message);
+    }
 }
 
 /* ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────── */

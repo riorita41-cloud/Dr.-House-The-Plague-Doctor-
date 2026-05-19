@@ -1,11 +1,18 @@
 # server.py — ФИНАЛЬНАЯ ВЕРСИЯ (20 признаков V8)
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from datetime import datetime
+from collections import deque
 import joblib
 import numpy as np
 import json
 import logging
+import subprocess
+import threading
+import io
+import sys
+import os
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +27,8 @@ with open('doctor_house_metadata_v8.json', 'r', encoding='utf-8') as f:
 
 CLASS_NAMES = meta['classes']
 FEATURE_NAMES = meta['features']
-logger.info(f"Модель: {len(CLASS_NAMES)} классов, {len(FEATURE_NAMES)} признаков")
+WINDOW_SIZE = meta['window_size']
+logger.info(f"Модель: {len(CLASS_NAMES)} классов, {len(FEATURE_NAMES)} признаков, окно: {WINDOW_SIZE}")
 
 # База знаний (подробные рецепты)
 STATE_DB = {
@@ -216,18 +224,28 @@ latest_realtime_data = {
     "pulse": 0, "emg": 0, "gsr": 0, "eeg": 0, "timestamp": None
 }
 
+# Скользящее окно для корректного вычисления признаков
+window_buffer = deque(maxlen=WINDOW_SIZE)
 
-def build_features(pulse, emg, gsr, eeg):
+
+def extract_features(window: np.ndarray) -> np.ndarray:
     features = []
-    channels = {"пульс": pulse, "эмг": emg, "кгр": gsr, "ээг": eeg}
-    for ch_name in ["пульс", "эмг", "кгр", "ээг"]:
-        mean_val = channels[ch_name]
-        features.append(mean_val)
-        features.append(mean_val * 0.05)
-        features.append(mean_val * 0.9)
-        features.append(mean_val * 1.1)
-        features.append(0.0)
+    n = window.shape[0]
+    x = np.arange(n, dtype=float)
+    for ch_idx in range(window.shape[1]):
+        col = window[:, ch_idx]
+        features.append(float(np.mean(col)))
+        features.append(float(np.std(col)))
+        features.append(float(np.min(col)))
+        features.append(float(np.max(col)))
+        slope = float(np.polyfit(x, col, 1)[0]) if n > 1 else 0.0
+        features.append(slope)
     return np.array(features, dtype=float)
+
+
+@app.route('/')
+def index():
+    return send_file('Чумной Доктор.html')
 
 
 @app.route('/api/analyze', methods=['POST', 'OPTIONS'])
@@ -249,8 +267,17 @@ def analyze():
         elif pulse > 130:
             result = STATE_DB["Тахикардия"].copy()
         else:
-            features = build_features(pulse, emg, gsr, eeg)
-            X = features.reshape(1, -1)
+            window_buffer.append([pulse, emg, gsr, eeg])
+            
+            if len(window_buffer) < WINDOW_SIZE:
+                padding = WINDOW_SIZE - len(window_buffer)
+                pad = [window_buffer[0]] * padding
+                win = np.array(list(pad) + list(window_buffer), dtype=float)
+            else:
+                win = np.array(list(window_buffer), dtype=float)
+            
+            feats = extract_features(win)
+            X = feats.reshape(1, -1)
             prediction = int(model.predict(X)[0])
             probas = model.predict_proba(X)[0]
             confidence = float(probas.max())
@@ -288,6 +315,136 @@ def update_realtime():
     return jsonify({"status": "ok"})
 
 
+# ══════════════════════════════════════════════════════════════
+# ADMIN PANEL — управление шагами через UI
+# ══════════════════════════════════════════════════════════════
+
+admin_log = []
+admin_lock = threading.Lock()
+realtime_process = None
+realtime_log_path = None
+
+
+def log_msg(msg):
+    ts = datetime.now().strftime('%H:%M:%S')
+    with admin_lock:
+        admin_log.append(f'[{ts}] {msg}')
+        # держим последние 100 строк
+        while len(admin_log) > 100:
+            admin_log.pop(0)
+    logger.info(msg)
+
+
+@app.route('/api/admin/status')
+def admin_status():
+    model_exists = os.path.exists('doctor_house_model_v8.pkl')
+    data_exists = os.path.exists('training_data_v8.csv')
+    meta_exists = os.path.exists('doctor_house_metadata_v8.json')
+    
+    status = {
+        'model_loaded': model_exists,
+        'model_accuracy': meta.get('quality', {}).get('best_test_accuracy', 0) if meta_exists else 0,
+        'data_exists': data_exists,
+        'window_size': WINDOW_SIZE,
+        'classes': CLASS_NAMES,
+        'features': len(FEATURE_NAMES),
+        'realtime_running': realtime_process is not None and realtime_process.poll() is None,
+        'server_uptime': str(datetime.now() - globals().get('_start_time', datetime.now())).split('.')[0],
+    }
+    return jsonify(status)
+
+
+@app.route('/api/admin/logs')
+def admin_get_logs():
+    with admin_lock:
+        log_content = '\n'.join(admin_log)
+    return jsonify({'logs': log_content})
+
+
+def run_train():
+    log_msg('🚀 Запуск обучения модели...')
+    try:
+        result = subprocess.run(
+            [sys.executable, 'step1_train_v8_final.py'],
+            capture_output=True, text=True, timeout=600
+        )
+        log_msg(result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout)
+        if result.returncode != 0:
+            log_msg(f'❌ Ошибка: {result.stderr[-500:]}')
+        else:
+            log_msg('✅ Обучение завершено успешно!')
+            # перезагружаем модель
+            globals()['model'] = joblib.load('doctor_house_model_v8.pkl')
+    except subprocess.TimeoutExpired:
+        log_msg('❌ Обучение прервано по таймауту (600 сек)')
+    except Exception as e:
+        log_msg(f'❌ Ошибка: {e}')
+
+
+def run_test():
+    log_msg('🧪 Запуск тестирования модели...')
+    try:
+        result = subprocess.run(
+            [sys.executable, 'step2_test_v8_full_report.py'],
+            capture_output=True, text=True, timeout=120
+        )
+        log_msg(result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout)
+        if result.returncode != 0:
+            log_msg(f'❌ Ошибка: {result.stderr[-500:]}')
+        else:
+            log_msg('✅ Тестирование завершено!')
+    except subprocess.TimeoutExpired:
+        log_msg('❌ Тестирование прервано по таймауту (120 сек)')
+    except Exception as e:
+        log_msg(f'❌ Ошибка: {e}')
+
+
+@app.route('/api/admin/train', methods=['POST'])
+def admin_train():
+    if not os.path.exists('training_data_v8.csv'):
+        return jsonify({'error': 'Файл training_data_v8.csv не найден'}), 400
+    thread = threading.Thread(target=run_train, daemon=True)
+    thread.start()
+    log_msg('📦 Обучение запущено в фоне')
+    return jsonify({'status': 'started', 'message': 'Обучение запущено'})
+
+
+@app.route('/api/admin/test', methods=['POST'])
+def admin_test():
+    thread = threading.Thread(target=run_test, daemon=True)
+    thread.start()
+    log_msg('🧪 Тестирование запущено в фоне')
+    return jsonify({'status': 'started', 'message': 'Тестирование запущено'})
+
+
+@app.route('/api/admin/realtime/start', methods=['POST'])
+def admin_realtime_start():
+    global realtime_process, realtime_log_path
+    if realtime_process is not None and realtime_process.poll() is None:
+        return jsonify({'error': 'Режим реального времени уже запущен'}), 400
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    realtime_log_path = f"admin_realtime_{ts}.log"
+    realtime_process = subprocess.Popen(
+        [sys.executable, 'step3_realtime_v8_2.py'],
+        stdout=open(realtime_log_path, 'w'),
+        stderr=subprocess.STDOUT,
+    )
+    log_msg(f'📡 Режим реального времени запущен (PID: {realtime_process.pid})')
+    return jsonify({'status': 'started', 'pid': realtime_process.pid})
+
+
+@app.route('/api/admin/realtime/stop', methods=['POST'])
+def admin_realtime_stop():
+    global realtime_process
+    if realtime_process is None or realtime_process.poll() is not None:
+        return jsonify({'error': 'Режим реального времени не запущен'}), 400
+    realtime_process.terminate()
+    realtime_process.wait(timeout=5)
+    log_msg('⏹ Режим реального времени остановлен')
+    realtime_process = None
+    return jsonify({'status': 'stopped'})
+
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -297,10 +454,11 @@ def after_request(response):
 
 
 if __name__ == '__main__':
+    globals()['_start_time'] = datetime.now()
     print("=" * 60)
     print("🌐 ДОКТОР ХАУС — Сервер v8.2 FINAL")
     print(f"   Адрес: http://127.0.0.1:5000")
-    print(f"   Признаков: 20 (восстановлены из 4 средних)")
+    print(f"   Признаков: {len(FEATURE_NAMES)} (окно {WINDOW_SIZE} точек)")
     print(f"   Классов: {len(CLASS_NAMES)}")
     print("=" * 60)
     app.run(debug=True, port=5000)

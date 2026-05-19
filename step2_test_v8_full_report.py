@@ -180,11 +180,11 @@ def compute_aggregates(window):
         elif agg == "max":
             features[feat] = round(float(np.max(values)), 2)
         elif agg == "slope":
-            # Линейный тренд (простая оценка)
+            # Линейный тренд (как в модели)
             if len(values) > 1:
                 x = np.arange(len(values))
                 slope = np.polyfit(x, values, 1)[0]
-                features[feat] = round(float(slope * len(values)), 3)
+                features[feat] = round(float(slope), 4)
             else:
                 features[feat] = 0.0
         else:
